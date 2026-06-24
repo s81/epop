@@ -37,8 +37,9 @@ export async function applyEvent(
   operationId: number,
   event: OperationEventType,
   opts?: { operatorId?: string; note?: string },
-): Promise<{ toStatus: OperationStatus }> {
-  return db.transaction(async (tx) => {
+  dbInstance: typeof db = db,
+): Promise<{ toStatus: OperationStatus; eventId: number }> {
+  return dbInstance.transaction(async (tx) => {
     const [op] = await tx
       .select({ status: workOrderOperation.status })
       .from(workOrderOperation)
@@ -63,13 +64,16 @@ export async function applyEvent(
     const toStatus = transition.toStatus;
     const now = new Date().toISOString();
 
-    await tx.insert(operationEvent).values({
-      operationId,
-      eventType: event,
-      operatorId: opts?.operatorId,
-      note: opts?.note,
-      occurredAt: now,
-    });
+    const [{ eventId }] = await tx
+      .insert(operationEvent)
+      .values({
+        operationId,
+        eventType: event,
+        operatorId: opts?.operatorId,
+        note: opts?.note,
+        occurredAt: now,
+      })
+      .returning({ eventId: operationEvent.id });
 
     const timestamp = timestampForStatus(toStatus, now);
     await tx
@@ -77,7 +81,7 @@ export async function applyEvent(
       .set({ status: toStatus, ...timestamp })
       .where(eq(workOrderOperation.id, operationId));
 
-    return { toStatus };
+    return { toStatus, eventId };
   });
 }
 
