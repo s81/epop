@@ -1,8 +1,12 @@
-import { and, eq } from 'drizzle-orm';
+import { and, asc, eq } from 'drizzle-orm';
 import { db } from './db';
 import {
+  model,
   operationEvent,
   operationTransition,
+  routingStep,
+  workOrder,
+  workOrderLine,
   workOrderOperation,
   type OperationEventType,
   type OperationStatus,
@@ -89,4 +93,79 @@ function timestampForStatus(
     case 'REJECTED':    return { rejectedAt: now };
     default:            return {};
   }
+}
+
+/**
+ * Releases a DRAFT work order: validates all lines have routing steps,
+ * then in one transaction inserts work_order_operation rows (one per line × step)
+ * and flips the work order status to RELEASED.
+ *
+ * Throws if: order not found, not DRAFT, has no lines, or any model lacks routing.
+ * The optional dbInstance parameter exists for unit-test injection.
+ */
+export async function releaseWorkOrder(
+  workOrderId: number,
+  dbInstance: typeof db = db,
+): Promise<void> {
+  const [order] = await dbInstance
+    .select({ id: workOrder.id, status: workOrder.status })
+    .from(workOrder)
+    .where(eq(workOrder.id, workOrderId));
+
+  if (!order) throw new Error(`Work order ${workOrderId} not found`);
+  if (order.status !== 'DRAFT') throw new Error('Work order is not in DRAFT status');
+
+  const lines = await dbInstance
+    .select({ id: workOrderLine.id, modelId: workOrderLine.modelId })
+    .from(workOrderLine)
+    .where(eq(workOrderLine.workOrderId, workOrderId));
+
+  if (lines.length === 0) throw new Error('Cannot release a work order with no lines');
+
+  // Pre-validate all models have routing — fail before writing anything
+  const lineSteps: { lineId: number; steps: { id: number; workCenterId: number; sequence: number }[] }[] = [];
+
+  for (const line of lines) {
+    const [mdl] = await dbInstance
+      .select({ code: model.code })
+      .from(model)
+      .where(eq(model.id, line.modelId));
+
+    const steps = await dbInstance
+      .select({
+        id: routingStep.id,
+        workCenterId: routingStep.workCenterId,
+        sequence: routingStep.sequence,
+      })
+      .from(routingStep)
+      .where(eq(routingStep.modelId, line.modelId))
+      .orderBy(asc(routingStep.sequence));
+
+    if (steps.length === 0) {
+      throw new Error(
+        `Model "${mdl?.code ?? String(line.modelId)}" has no routing steps — define routing before releasing`,
+      );
+    }
+
+    lineSteps.push({ lineId: line.id, steps });
+  }
+
+  const now = new Date().toISOString();
+
+  await dbInstance.transaction(async (tx) => {
+    for (const { lineId, steps } of lineSteps) {
+      for (const step of steps) {
+        await tx.insert(workOrderOperation).values({
+          workOrderLineId: lineId,
+          workCenterId: step.workCenterId,
+          routingStepId: step.id,
+          sequence: step.sequence,
+        });
+      }
+    }
+    await tx
+      .update(workOrder)
+      .set({ status: 'RELEASED', releasedAt: now })
+      .where(eq(workOrder.id, workOrderId));
+  });
 }
