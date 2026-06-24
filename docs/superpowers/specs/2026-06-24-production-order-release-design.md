@@ -87,16 +87,17 @@ The server action wraps this in try/catch and returns `{ error }` for the UI to 
 
 ### `/orders/` — list
 
-- Table: Order Number | Status badge | Lines | Created | "Open →" link
+- Table: Order Number | Status badge | Lines | Created | "Open →" link | Delete button (DRAFT only)
 - Status badge colours: DRAFT=gray, RELEASED=blue, IN_PROGRESS=amber, COMPLETED=green
 - "New Work Order" button top-right — single click, no modal; calls `createWorkOrder()` and redirects
+- Delete button: calls `deleteWorkOrder()`, DRAFT orders only, confirm dialog before submitting
 
 ### `/orders/[id]` — detail
 
 **Header area:**
 - Order number (large), status badge, Created timestamp
-- Scheduled Start / Scheduled End (text inputs, editable in DRAFT only)
 - "Release" button — top-right, shown only when DRAFT; on error shows message inline, order stays DRAFT
+- Note: `scheduled_start` / `scheduled_end` columns exist in the schema but are Phase 8 (scheduler) output — not editable in Phase 3
 
 **Lines table:**
 - Columns: Model | Color | Qty | (Delete button — hidden when not DRAFT)
