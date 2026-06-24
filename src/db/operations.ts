@@ -100,6 +100,12 @@ function timestampForStatus(
  * then in one transaction inserts work_order_operation rows (one per line × step)
  * and flips the work order status to RELEASED.
  *
+ * The entire flow runs inside a single transaction. The final UPDATE uses a
+ * conditional WHERE clause (status = 'DRAFT') so that a concurrent caller that
+ * already committed RELEASED will cause the UPDATE to match 0 rows — detected
+ * and rejected — eliminating the TOCTOU race that would otherwise produce
+ * duplicate work_order_operation rows.
+ *
  * Throws if: order not found, not DRAFT, has no lines, or any model lacks routing.
  * The optional dbInstance parameter exists for unit-test injection.
  */
@@ -107,52 +113,52 @@ export async function releaseWorkOrder(
   workOrderId: number,
   dbInstance: typeof db = db,
 ): Promise<void> {
-  const [order] = await dbInstance
-    .select({ id: workOrder.id, status: workOrder.status })
-    .from(workOrder)
-    .where(eq(workOrder.id, workOrderId));
+  await dbInstance.transaction(async (tx) => {
+    const [order] = await tx
+      .select({ id: workOrder.id, status: workOrder.status })
+      .from(workOrder)
+      .where(eq(workOrder.id, workOrderId));
 
-  if (!order) throw new Error(`Work order ${workOrderId} not found`);
-  if (order.status !== 'DRAFT') throw new Error('Work order is not in DRAFT status');
+    if (!order) throw new Error(`Work order ${workOrderId} not found`);
+    if (order.status !== 'DRAFT') throw new Error('Work order is not in DRAFT status');
 
-  const lines = await dbInstance
-    .select({ id: workOrderLine.id, modelId: workOrderLine.modelId })
-    .from(workOrderLine)
-    .where(eq(workOrderLine.workOrderId, workOrderId));
+    const lines = await tx
+      .select({ id: workOrderLine.id, modelId: workOrderLine.modelId })
+      .from(workOrderLine)
+      .where(eq(workOrderLine.workOrderId, workOrderId));
 
-  if (lines.length === 0) throw new Error('Cannot release a work order with no lines');
+    if (lines.length === 0) throw new Error('Cannot release a work order with no lines');
 
-  // Pre-validate all models have routing — fail before writing anything
-  const lineSteps: { lineId: number; steps: { id: number; workCenterId: number; sequence: number }[] }[] = [];
+    // Pre-validate all models have routing — fail before writing anything
+    const lineSteps: { lineId: number; steps: { id: number; workCenterId: number; sequence: number }[] }[] = [];
 
-  for (const line of lines) {
-    const [mdl] = await dbInstance
-      .select({ code: model.code })
-      .from(model)
-      .where(eq(model.id, line.modelId));
+    for (const line of lines) {
+      const [mdl] = await tx
+        .select({ code: model.code })
+        .from(model)
+        .where(eq(model.id, line.modelId));
 
-    const steps = await dbInstance
-      .select({
-        id: routingStep.id,
-        workCenterId: routingStep.workCenterId,
-        sequence: routingStep.sequence,
-      })
-      .from(routingStep)
-      .where(eq(routingStep.modelId, line.modelId))
-      .orderBy(asc(routingStep.sequence));
+      const steps = await tx
+        .select({
+          id: routingStep.id,
+          workCenterId: routingStep.workCenterId,
+          sequence: routingStep.sequence,
+        })
+        .from(routingStep)
+        .where(eq(routingStep.modelId, line.modelId))
+        .orderBy(asc(routingStep.sequence));
 
-    if (steps.length === 0) {
-      throw new Error(
-        `Model "${mdl?.code ?? String(line.modelId)}" has no routing steps — define routing before releasing`,
-      );
+      if (steps.length === 0) {
+        throw new Error(
+          `Model "${mdl?.code ?? String(line.modelId)}" has no routing steps — define routing before releasing`,
+        );
+      }
+
+      lineSteps.push({ lineId: line.id, steps });
     }
 
-    lineSteps.push({ lineId: line.id, steps });
-  }
+    const now = new Date().toISOString();
 
-  const now = new Date().toISOString();
-
-  await dbInstance.transaction(async (tx) => {
     for (const { lineId, steps } of lineSteps) {
       for (const step of steps) {
         await tx.insert(workOrderOperation).values({
@@ -163,9 +169,15 @@ export async function releaseWorkOrder(
         });
       }
     }
-    await tx
+
+    const result = await tx
       .update(workOrder)
       .set({ status: 'RELEASED', releasedAt: now })
-      .where(eq(workOrder.id, workOrderId));
+      .where(and(eq(workOrder.id, workOrderId), eq(workOrder.status, 'DRAFT')));
+
+    // If 0 rows were updated, a concurrent caller already released this order
+    if (result.rowsAffected === 0) {
+      throw new Error('Work order is not in DRAFT status');
+    }
   });
 }

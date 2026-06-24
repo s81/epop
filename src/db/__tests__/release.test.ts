@@ -1,4 +1,4 @@
-import { afterEach, describe, it, expect } from 'vitest';
+import { beforeAll, afterEach, describe, it, expect } from 'vitest';
 import { eq } from 'drizzle-orm';
 import { createClient } from '@libsql/client';
 import { drizzle } from 'drizzle-orm/libsql';
@@ -7,54 +7,31 @@ import { releaseWorkOrder } from '@/db/operations';
 import fs from 'fs';
 import path from 'path';
 
-// Initialize DB with file-based SQLite (in-memory :memory: URLs are isolated per connection in libSQL)
-const testDbPath = path.resolve(process.cwd(), 'test.db');
-const testClient = createClient({ url: `file:${testDbPath}` });
+// Use file::memory:?cache=shared so that multiple connections within the same process
+// share a single in-memory database. The plain ':memory:' URL allocates a NEW database
+// on every new SQLite connection; because the libSQL Sqlite3Client creates a fresh
+// connection after each transaction() call, ':memory:' loses all schema/data after the
+// first transaction. The shared-cache URI avoids this while staying fully in-memory.
+const testClient = createClient({ url: 'file::memory:?cache=shared' });
 const testDb = drizzle(testClient, { schema });
 
-// Execute migrations synchronously using sync API
-async function initializeDatabase() {
+beforeAll(async () => {
   await testClient.execute('PRAGMA foreign_keys = ON');
-
   const migrationPath = path.resolve(process.cwd(), 'src/db/migrations/0000_misty_khan.sql');
   const migrationSql = fs.readFileSync(migrationPath, 'utf-8');
-  const statements = migrationSql
-    .split('--> statement-breakpoint')
-    .map((s: string) => s.trim())
-    .filter((s: string) => s.length > 0);
-
-  for (const stmt of statements) {
-    try {
-      await testClient.execute(stmt);
-    } catch (err: any) {
-      // Ignore "already exists" errors and duplicate constraint errors from seed data
-      const msg = err.message || '';
-      if (!msg.includes('already exists') && !msg.includes('UNIQUE constraint')) {
-        throw err;
-      }
-    }
-  }
-}
-
-// This promise is created at module load but its result is awaited in each test
-const dbReady = initializeDatabase();
+  await testClient.executeMultiple(migrationSql);
+});
 
 afterEach(async () => {
-  try {
-    // Clear data between tests but preserve schema
-    await testDb.delete(schema.operationEvent);
-    await testDb.delete(schema.workOrderOperation);
-    await testDb.delete(schema.workOrderLine);
-    await testDb.delete(schema.workOrder);
-    await testDb.delete(schema.routingStep);
-    await testDb.delete(schema.color);
-    await testDb.delete(schema.colorFamily);
-    await testDb.delete(schema.workCenter);
-    await testDb.delete(schema.model);
-    await testDb.delete(schema.department);
-  } catch (err) {
-    // Ignore errors
-  }
+  // Clear data between tests but preserve schema.
+  // FK-safe delete order: child tables first.
+  await testDb.delete(schema.workOrderOperation);
+  await testDb.delete(schema.workOrderLine);
+  await testDb.delete(schema.workOrder);
+  await testDb.delete(schema.routingStep);
+  await testDb.delete(schema.workCenter);
+  await testDb.delete(schema.model);
+  await testDb.delete(schema.department);
 });
 
 async function seedBase() {
@@ -83,7 +60,6 @@ async function seedBase() {
 
 describe('releaseWorkOrder', () => {
   it('creates one operation per line×step and flips status to RELEASED', async () => {
-    await dbReady;
     const { mdl, wc, step } = await seedBase();
 
     const [wo] = await testDb
@@ -119,7 +95,6 @@ describe('releaseWorkOrder', () => {
   });
 
   it('throws if order is already RELEASED', async () => {
-    await dbReady;
     const [wo] = await testDb
       .insert(schema.workOrder)
       .values({ orderNumber: 'PO-2026-002', status: 'RELEASED' })
@@ -129,7 +104,6 @@ describe('releaseWorkOrder', () => {
   });
 
   it('throws naming the model when it has no routing steps', async () => {
-    await dbReady;
     const [mdl] = await testDb
       .insert(schema.model)
       .values({ code: 'MDL-B', nameAr: 'نموذج ب', nameEn: 'Model B' })
@@ -148,7 +122,6 @@ describe('releaseWorkOrder', () => {
   });
 
   it('throws if order has no lines', async () => {
-    await dbReady;
     const [wo] = await testDb
       .insert(schema.workOrder)
       .values({ orderNumber: 'PO-2026-004', status: 'DRAFT' })
