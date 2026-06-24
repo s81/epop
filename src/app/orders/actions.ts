@@ -16,7 +16,7 @@ export async function createWorkOrder() {
       .select({ orderNumber: workOrder.orderNumber })
       .from(workOrder)
       .where(like(workOrder.orderNumber, pattern))
-      .orderBy(desc(workOrder.orderNumber))
+      .orderBy(desc(workOrder.id))
       .limit(1);
 
     const lastN = last ? parseInt(last.orderNumber.split('-')[2], 10) : 0;
