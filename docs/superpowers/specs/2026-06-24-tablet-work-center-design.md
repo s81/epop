@@ -155,7 +155,7 @@ Each button is its own `<form>` with `action={applyEventAction}` and hidden inpu
 | Work center not found (bad URL) | `notFound()` |
 | Transient poll failure | Silent — next poll retries; no UI change |
 
-Error state auto-clears when new props arrive from the next `router.refresh()`.
+Error display uses a separate `useState<string | null>` (not `useActionState` directly). Clear it at the start of each poll cycle inside the `setInterval` callback before calling `router.refresh()`. Set it whenever the action state changes to an error value (via `useEffect` watching action state). This ensures errors auto-clear within 8 seconds without manual dismissal.
 
 ---
 
