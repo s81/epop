@@ -13,16 +13,18 @@ export async function addLine(_prev: unknown, formData: FormData) {
   const quantity = Math.max(1, Number(formData.get('quantity')) || 1);
 
   try {
-    const [order] = await db
-      .select({ status: workOrder.status })
-      .from(workOrder)
-      .where(eq(workOrder.id, workOrderId));
+    await db.transaction(async (tx) => {
+      const [order] = await tx
+        .select({ status: workOrder.status })
+        .from(workOrder)
+        .where(eq(workOrder.id, workOrderId));
 
-    if (!order || order.status !== 'DRAFT') {
-      return { error: 'Cannot modify a released order' };
-    }
+      if (!order || order.status !== 'DRAFT') {
+        throw new Error('Cannot modify a released order');
+      }
 
-    await db.insert(workOrderLine).values({ workOrderId, modelId, colorId, quantity });
+      await tx.insert(workOrderLine).values({ workOrderId, modelId, colorId, quantity });
+    });
     revalidatePath(`/orders/${workOrderId}`);
     return { success: true };
   } catch (e) {
@@ -34,15 +36,22 @@ export async function deleteLine(formData: FormData) {
   const lineId = Number(formData.get('lineId'));
   const workOrderId = Number(formData.get('workOrderId'));
 
-  const [order] = await db
-    .select({ status: workOrder.status })
-    .from(workOrder)
-    .where(eq(workOrder.id, workOrderId));
+  try {
+    await db.transaction(async (tx) => {
+      const [order] = await tx
+        .select({ status: workOrder.status })
+        .from(workOrder)
+        .where(eq(workOrder.id, workOrderId));
 
-  if (!order || order.status !== 'DRAFT') return;
+      if (!order || order.status !== 'DRAFT') return;
 
-  await db.delete(workOrderLine).where(eq(workOrderLine.id, lineId));
-  revalidatePath(`/orders/${workOrderId}`);
+      await tx.delete(workOrderLine).where(eq(workOrderLine.id, lineId));
+    });
+    revalidatePath(`/orders/${workOrderId}`);
+  } catch {
+    // line may already be gone; revalidate so UI stays consistent
+    revalidatePath(`/orders/${workOrderId}`);
+  }
 }
 
 export async function releaseOrderAction(_prev: unknown, formData: FormData) {

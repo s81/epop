@@ -1,5 +1,5 @@
 'use server';
-import { desc, eq, like } from 'drizzle-orm';
+import { and, desc, eq, like } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { db } from '@/db/db';
@@ -35,14 +35,6 @@ export async function createWorkOrder() {
 
 export async function deleteWorkOrder(formData: FormData) {
   const id = Number(formData.get('id'));
-
-  const [order] = await db
-    .select({ status: workOrder.status })
-    .from(workOrder)
-    .where(eq(workOrder.id, id));
-
-  if (!order || order.status !== 'DRAFT') return;
-
-  await db.delete(workOrder).where(eq(workOrder.id, id));
+  await db.delete(workOrder).where(and(eq(workOrder.id, id), eq(workOrder.status, 'DRAFT')));
   revalidatePath('/orders');
 }

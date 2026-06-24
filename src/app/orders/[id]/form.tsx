@@ -24,7 +24,7 @@ export function LineForm({
 
   useEffect(() => {
     if (state && 'success' in state) onSuccess();
-  }, [state]);
+  }, [state, onSuccess]);
 
   return (
     <form action={formAction}>
