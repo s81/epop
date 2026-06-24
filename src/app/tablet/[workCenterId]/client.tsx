@@ -308,7 +308,7 @@ export function TabletClient({
                     <span className="text-gray-400 text-sm flex-shrink-0">{op.orderNumber}</span>
                   </div>
                   <span
-                    className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium flex-shrink-0 ml-2 ${STATUS_BADGE[op.status]}`}
+                    className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium flex-shrink-0 ms-2 ${STATUS_BADGE[op.status]}`}
                   >
                     {STATUS_LABEL[op.status].split(' / ')[0]}
                   </span>
