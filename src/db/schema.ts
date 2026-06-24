@@ -183,3 +183,46 @@ export const operationTransition = sqliteTable('operation_transition', {
   eventType: text('event_type', { enum: OPERATION_EVENT_TYPES }).notNull(),
   toStatus: text('to_status', { enum: OPERATION_STATUSES }).notNull(),
 });
+
+// --- Maintenance & Quality ---
+
+export const MAINTENANCE_CATEGORIES = ['MECHANICAL', 'ELECTRICAL', 'TOOLING', 'OTHER'] as const;
+export type MaintenanceCategory = (typeof MAINTENANCE_CATEGORIES)[number];
+
+export const MAINTENANCE_STATUSES = ['OPEN', 'RESOLVED'] as const;
+export type MaintenanceStatus = (typeof MAINTENANCE_STATUSES)[number];
+
+export const QUALITY_DEFECT_CATEGORIES = ['DIMENSIONAL', 'SURFACE', 'ASSEMBLY', 'OTHER'] as const;
+export type QualityDefectCategory = (typeof QUALITY_DEFECT_CATEGORIES)[number];
+
+export const maintenanceRequest = sqliteTable('maintenance_request', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  workCenterId: integer('work_center_id')
+    .notNull()
+    .references(() => workCenter.id),
+  operationId: integer('operation_id')
+    .references(() => workOrderOperation.id),
+  category: text('category', { enum: MAINTENANCE_CATEGORIES }).notNull(),
+  note: text('note'),
+  reportedBy: text('reported_by').notNull(),
+  status: text('status', { enum: MAINTENANCE_STATUSES }).notNull().default('OPEN'),
+  resolvedAt: text('resolved_at'),
+  createdAt: text('created_at')
+    .notNull()
+    .default(sql`(strftime('%Y-%m-%dT%H:%M:%fZ','now'))`),
+});
+
+export const qualityDefect = sqliteTable('quality_defect', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  operationId: integer('operation_id')
+    .notNull()
+    .references(() => workOrderOperation.id),
+  operationEventId: integer('operation_event_id')
+    .notNull()
+    .references(() => operationEvent.id),
+  category: text('category', { enum: QUALITY_DEFECT_CATEGORIES }).notNull(),
+  reportedBy: text('reported_by').notNull(),
+  createdAt: text('created_at')
+    .notNull()
+    .default(sql`(strftime('%Y-%m-%dT%H:%M:%fZ','now'))`),
+});
