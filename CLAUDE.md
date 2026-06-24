@@ -44,6 +44,15 @@ Status: Phase 0 schema ✅ · Phase 1 backend engine ✅ · Phase 1a master data
    dispatch using work_center capacity/buffer + shift calendar + routing times.
    Hardest piece; do it LAST and validate against real Phase 1–2 data.
 
+## Security — NOT YET IMPLEMENTED
+- All `/admin/*` server actions have **no auth gate**. They are independently
+  callable HTTP endpoints — anyone who can reach the server can mutate master data.
+- Before deploying to a networked environment, add:
+  1. `middleware.ts` guarding `/admin/*` (redirect unauthenticated to `/login`)
+  2. A `requireAdmin()` helper called at the top of every `actions.ts` function
+  3. An auth system (NextAuth / Clerk / custom) with a user/session model
+- Deferred deliberately — no auth design exists yet. Do this before Phase 4 (tablet UI).
+
 ## Conventions / gotchas
 - Enable FK enforcement (`PRAGMA foreign_keys = ON;`) on the connection or
   `ON DELETE CASCADE` won't fire. It's in `db.ts`.
