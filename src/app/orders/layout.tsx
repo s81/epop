@@ -15,7 +15,10 @@ export default function OrdersLayout({ children }: { children: React.ReactNode }
             Work Orders
           </Link>
         </nav>
-        <div className="px-4 py-3 border-t border-gray-700">
+        <div className="px-4 py-3 border-t border-gray-700 flex flex-col gap-1">
+          <Link href="/tablet" className="text-xs text-gray-500 hover:text-gray-300 transition-colors">
+            Tablet →
+          </Link>
           <Link href="/admin" className="text-xs text-gray-500 hover:text-gray-300 transition-colors">
             ← Master Data
           </Link>

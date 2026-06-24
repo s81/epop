@@ -1,0 +1,7 @@
+export default function TabletLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="bg-gray-950 text-white min-h-screen">
+      {children}
+    </div>
+  );
+}
