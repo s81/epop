@@ -13,7 +13,7 @@ import {
 import { TabletClient } from './client';
 import { applyEventAction } from './actions';
 
-const OPEN_STATUSES: OperationStatus[] = ['QUEUED', 'IN_PROGRESS', 'PAUSED'];
+const OPEN_STATUSES: OperationStatus[] = ['QUEUED', 'IN_PROGRESS', 'PAUSED', 'PENDING_QC'];
 
 export default async function TabletPage({
   params,
