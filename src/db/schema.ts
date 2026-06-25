@@ -226,3 +226,20 @@ export const qualityDefect = sqliteTable('quality_defect', {
     .notNull()
     .default(sql`(strftime('%Y-%m-%dT%H:%M:%fZ','now'))`),
 });
+
+// --- Auth ---
+
+export const USER_ROLES = ['VIEWER', 'DATA_ENTRY', 'ADMIN'] as const;
+export type UserRole = (typeof USER_ROLES)[number];
+
+export const user = sqliteTable('user', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  username: text('username').notNull().unique(),
+  displayName: text('display_name').notNull(),
+  passwordHash: text('password_hash').notNull(),
+  role: text('role', { enum: USER_ROLES }).notNull(),
+  lastLoginAt: text('last_login_at'),
+  createdAt: text('created_at')
+    .notNull()
+    .default(sql`(strftime('%Y-%m-%dT%H:%M:%fZ','now'))`),
+});
