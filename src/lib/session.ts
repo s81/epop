@@ -15,8 +15,9 @@ function secret(): Uint8Array {
 export type SessionPayload = { userId: number; role: UserRole; displayName: string };
 
 export async function getSessionFromToken(token: string): Promise<SessionPayload | null> {
+  const key = secret(); // throws if SESSION_SECRET absent — propagates to caller
   try {
-    const { payload } = await jwtVerify(token, secret());
+    const { payload } = await jwtVerify(token, key);
     return {
       userId: Number(payload.sub),
       role: payload.role as UserRole,
