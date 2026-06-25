@@ -36,23 +36,23 @@ export async function reportMaintenanceAction(
   _prev: unknown,
   formData: FormData,
 ): Promise<{ error: string } | null> {
-  const workCenterId = Number(formData.get('workCenterId'));
-  const operationIdRaw = formData.get('operationId');
-  const operationId = operationIdRaw ? Number(operationIdRaw) : null;
-  const category = formData.get('category') as MaintenanceCategory;
-  if (!MAINTENANCE_CATEGORIES.includes(category)) return { error: 'Invalid category' };
-  const note = (formData.get('note') as string | null) || null;
-  const reportedBy = String(formData.get('operatorId') ?? '').trim() || 'unknown';
-
-  if (operationId !== null) {
-    const [op] = await db
-      .select({ wcId: workOrderOperation.workCenterId })
-      .from(workOrderOperation)
-      .where(eq(workOrderOperation.id, operationId));
-    if (!op || op.wcId !== workCenterId) return { error: 'Operation does not belong to this work center' };
-  }
-
   try {
+    const workCenterId = Number(formData.get('workCenterId'));
+    const operationIdRaw = formData.get('operationId');
+    const operationId = operationIdRaw ? Number(operationIdRaw) : null;
+    const category = formData.get('category') as MaintenanceCategory;
+    if (!MAINTENANCE_CATEGORIES.includes(category)) return { error: 'Invalid category' };
+    const note = (formData.get('note') as string | null) || null;
+    const reportedBy = String(formData.get('operatorId') ?? '').trim() || 'unknown';
+
+    if (operationId !== null) {
+      const [op] = await db
+        .select({ wcId: workOrderOperation.workCenterId })
+        .from(workOrderOperation)
+        .where(eq(workOrderOperation.id, operationId));
+      if (!op || op.wcId !== workCenterId) return { error: 'Operation does not belong to this work center' };
+    }
+
     await db.insert(maintenanceRequest).values({
       workCenterId,
       operationId,
@@ -60,8 +60,10 @@ export async function reportMaintenanceAction(
       note,
       reportedBy,
     });
+    revalidatePath(`/tablet/${workCenterId}`);
     return null;
   } catch (e) {
+    console.error('reportMaintenanceAction error:', e);
     return { error: e instanceof Error ? e.message : String(e) };
   }
 }

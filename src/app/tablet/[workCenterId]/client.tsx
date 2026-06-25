@@ -195,9 +195,14 @@ export function TabletClient({
       fd.append('category', category);
       if (note) fd.append('note', note);
       fd.append('operatorId', operatorId);
-      const result = await onMaintenance(null, fd);
-      setModal(null);
-      if (result?.error) setDisplayError(result.error);
+      try {
+        const result = await onMaintenance(null, fd);
+        setModal(null);
+        if (result?.error) setDisplayError(result.error);
+      } catch (e) {
+        setModal(null);
+        setDisplayError(e instanceof Error ? e.message : String(e));
+      }
     });
   }
 
@@ -209,10 +214,15 @@ export function TabletClient({
       fd.append('defectCategory', defectCategory);
       fd.append('workCenterId', String(workCenter.id));
       fd.append('operatorId', operatorId);
-      const result = await onRejectWithDefect(null, fd);
-      setModal(null);
-      if (result?.error) setDisplayError(result.error);
-      router.refresh();
+      try {
+        const result = await onRejectWithDefect(null, fd);
+        setModal(null);
+        if (result?.error) setDisplayError(result.error);
+        router.refresh();
+      } catch (e) {
+        setModal(null);
+        setDisplayError(e instanceof Error ? e.message : String(e));
+      }
     });
   }
 
@@ -429,18 +439,23 @@ export function TabletClient({
       </div>
 
       {/* Footer nav */}
-      <footer className="px-6 py-3 bg-gray-900 border-t border-gray-800 flex-shrink-0 flex items-center justify-between">
-        <Link href="/tablet" className="text-xs text-gray-600 hover:text-gray-400 transition-colors">
-          ← محطات العمل / Work Centers
-        </Link>
-        <button
-          type="button"
-          onClick={handleMaintenanceClick}
-          disabled={isPending}
-          className="text-xs text-amber-500 hover:text-amber-400 disabled:opacity-50 transition-colors font-medium"
-        >
-          ⚠ إبلاغ عن عطل / Report Maintenance
-        </button>
+      <footer className="px-6 py-3 bg-gray-900 border-t border-gray-800 flex-shrink-0">
+        {displayError && !active && (
+          <p className="text-red-400 text-sm mb-2">⚠ {displayError}</p>
+        )}
+        <div className="flex items-center justify-between">
+          <Link href="/tablet" className="text-xs text-gray-600 hover:text-gray-400 transition-colors">
+            ← محطات العمل / Work Centers
+          </Link>
+          <button
+            type="button"
+            onClick={handleMaintenanceClick}
+            disabled={isPending}
+            className="text-xs text-amber-500 hover:text-amber-400 disabled:opacity-50 transition-colors font-medium"
+          >
+            ⚠ إبلاغ عن عطل / Report Maintenance
+          </button>
+        </div>
       </footer>
     </div>
   );
