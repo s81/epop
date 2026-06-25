@@ -15,9 +15,8 @@ function secret(): Uint8Array {
 export type SessionPayload = { userId: number; role: UserRole; displayName: string };
 
 export async function getSessionFromToken(token: string): Promise<SessionPayload | null> {
-  const key = secret(); // throws if SESSION_SECRET absent — propagates to caller
   try {
-    const { payload } = await jwtVerify(token, key);
+    const { payload } = await jwtVerify(token, secret());
     return {
       userId: Number(payload.sub),
       role: payload.role as UserRole,
@@ -49,9 +48,10 @@ export async function createSessionCookie(
   const jar = await cookies();
   jar.set(COOKIE_NAME, token, {
     httpOnly: true,
-    sameSite: 'lax',
+    sameSite: 'lax' as const,
     path: '/',
     expires: new Date(Date.now() + SESSION_MS),
+    secure: process.env.NODE_ENV === 'production',
   });
 }
 
