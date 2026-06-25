@@ -3,6 +3,7 @@ import { asc, desc, eq } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
 import { db } from '@/db/db';
 import { routingStep } from '@/db/schema';
+import { requireRole } from '@/lib/auth';
 
 export async function saveStep(_prev: unknown, formData: FormData) {
   const id = formData.get('id');
@@ -14,6 +15,7 @@ export async function saveStep(_prev: unknown, formData: FormData) {
   const mco = (formData.get('mco') as string)?.trim() || null;
 
   try {
+    await requireRole('DATA_ENTRY');
     if (id) {
       await db
         .update(routingStep)
@@ -48,6 +50,7 @@ export async function saveStep(_prev: unknown, formData: FormData) {
 }
 
 export async function deleteStep(formData: FormData) {
+  await requireRole('DATA_ENTRY');
   const id = Number(formData.get('id'));
   const modelId = Number(formData.get('modelId'));
   await db.delete(routingStep).where(eq(routingStep.id, id));
@@ -56,6 +59,7 @@ export async function deleteStep(formData: FormData) {
 }
 
 export async function moveStep(formData: FormData) {
+  await requireRole('DATA_ENTRY');
   const id = Number(formData.get('id'));
   const direction = formData.get('direction') as 'up' | 'down';
 

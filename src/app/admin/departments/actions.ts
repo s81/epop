@@ -3,6 +3,7 @@ import { eq } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
 import { db } from '@/db/db';
 import { department } from '@/db/schema';
+import { requireRole } from '@/lib/auth';
 
 export async function saveDepartment(_prev: unknown, formData: FormData) {
   const id = formData.get('id');
@@ -11,6 +12,7 @@ export async function saveDepartment(_prev: unknown, formData: FormData) {
   const nameEn = (formData.get('nameEn') as string).trim();
 
   try {
+    await requireRole('DATA_ENTRY');
     if (id) {
       await db.update(department).set({ code, nameAr, nameEn }).where(eq(department.id, Number(id)));
     } else {
@@ -25,6 +27,7 @@ export async function saveDepartment(_prev: unknown, formData: FormData) {
 }
 
 export async function deleteDepartment(formData: FormData) {
+  await requireRole('DATA_ENTRY');
   const id = Number(formData.get('id'));
   await db.delete(department).where(eq(department.id, id));
   revalidatePath('/admin/departments');

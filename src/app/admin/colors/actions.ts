@@ -3,6 +3,7 @@ import { eq } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
 import { db } from '@/db/db';
 import { color } from '@/db/schema';
+import { requireRole } from '@/lib/auth';
 
 export async function saveColor(_prev: unknown, formData: FormData) {
   const id = formData.get('id');
@@ -12,6 +13,7 @@ export async function saveColor(_prev: unknown, formData: FormData) {
   const colorFamilyId = Number(formData.get('colorFamilyId'));
 
   try {
+    await requireRole('DATA_ENTRY');
     if (id) {
       await db
         .update(color)
@@ -29,6 +31,7 @@ export async function saveColor(_prev: unknown, formData: FormData) {
 }
 
 export async function deleteColor(formData: FormData) {
+  await requireRole('DATA_ENTRY');
   const id = Number(formData.get('id'));
   await db.delete(color).where(eq(color.id, id));
   revalidatePath('/admin/colors');

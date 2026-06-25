@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { db } from '@/db/db';
 import { workOrder, workOrderLine } from '@/db/schema';
 import { releaseWorkOrder } from '@/db/operations';
+import { requireRole } from '@/lib/auth';
 
 export async function addLine(_prev: unknown, formData: FormData) {
   const workOrderId = Number(formData.get('workOrderId'));
@@ -13,6 +14,7 @@ export async function addLine(_prev: unknown, formData: FormData) {
   const quantity = Math.max(1, Number(formData.get('quantity')) || 1);
 
   try {
+    await requireRole('DATA_ENTRY');
     await db.transaction(async (tx) => {
       const [order] = await tx
         .select({ status: workOrder.status })
@@ -37,6 +39,7 @@ export async function deleteLine(formData: FormData) {
   const workOrderId = Number(formData.get('workOrderId'));
 
   try {
+    await requireRole('DATA_ENTRY');
     await db.transaction(async (tx) => {
       const [order] = await tx
         .select({ status: workOrder.status })
@@ -57,6 +60,7 @@ export async function deleteLine(formData: FormData) {
 export async function releaseOrderAction(_prev: unknown, formData: FormData) {
   const id = Number(formData.get('id'));
   try {
+    await requireRole('DATA_ENTRY');
     await releaseWorkOrder(id);
     revalidatePath(`/orders/${id}`);
     revalidatePath('/orders');

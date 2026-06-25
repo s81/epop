@@ -3,6 +3,7 @@ import { eq } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
 import { db } from '@/db/db';
 import { model } from '@/db/schema';
+import { requireRole } from '@/lib/auth';
 
 export async function saveModel(_prev: unknown, formData: FormData) {
   const id = formData.get('id');
@@ -11,6 +12,7 @@ export async function saveModel(_prev: unknown, formData: FormData) {
   const nameEn = (formData.get('nameEn') as string).trim();
 
   try {
+    await requireRole('DATA_ENTRY');
     if (id) {
       await db.update(model).set({ code, nameAr, nameEn }).where(eq(model.id, Number(id)));
     } else {
@@ -25,6 +27,7 @@ export async function saveModel(_prev: unknown, formData: FormData) {
 }
 
 export async function deleteModel(formData: FormData) {
+  await requireRole('DATA_ENTRY');
   const id = Number(formData.get('id'));
   await db.delete(model).where(eq(model.id, id));
   revalidatePath('/admin/models');

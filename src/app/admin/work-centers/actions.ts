@@ -3,6 +3,7 @@ import { eq } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
 import { db } from '@/db/db';
 import { workCenter } from '@/db/schema';
+import { requireRole } from '@/lib/auth';
 
 export async function saveWorkCenter(_prev: unknown, formData: FormData) {
   const id = formData.get('id');
@@ -14,6 +15,7 @@ export async function saveWorkCenter(_prev: unknown, formData: FormData) {
   const bufferMinutes = parseInt(formData.get('bufferMinutes') as string) || 0;
 
   try {
+    await requireRole('DATA_ENTRY');
     if (id) {
       await db
         .update(workCenter)
@@ -31,6 +33,7 @@ export async function saveWorkCenter(_prev: unknown, formData: FormData) {
 }
 
 export async function deleteWorkCenter(formData: FormData) {
+  await requireRole('DATA_ENTRY');
   const id = Number(formData.get('id'));
   await db.delete(workCenter).where(eq(workCenter.id, id));
   revalidatePath('/admin/work-centers');

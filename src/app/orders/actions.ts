@@ -4,8 +4,10 @@ import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { db } from '@/db/db';
 import { workOrder } from '@/db/schema';
+import { requireRole } from '@/lib/auth';
 
 export async function createWorkOrder() {
+  await requireRole('DATA_ENTRY');
   const year = new Date().getFullYear();
   const pattern = `PO-${year}-%`;
 
@@ -34,6 +36,7 @@ export async function createWorkOrder() {
 }
 
 export async function deleteWorkOrder(formData: FormData) {
+  await requireRole('DATA_ENTRY');
   const id = Number(formData.get('id'));
   await db.delete(workOrder).where(and(eq(workOrder.id, id), eq(workOrder.status, 'DRAFT')));
   revalidatePath('/orders');
