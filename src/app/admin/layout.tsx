@@ -6,7 +6,9 @@ const NAV = [
   { href: '/admin/models',        label: 'Models' },
   { href: '/admin/color-families',label: 'Color Families' },
   { href: '/admin/colors',        label: 'Colors' },
-  { href: '/admin/routing',       label: 'Routing' },
+  { href: '/admin/routing',        label: 'Routing' },
+  { href: '/admin/maintenance',    label: 'Maintenance' },
+  { href: '/admin/quality',        label: 'Quality' },
 ];
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
