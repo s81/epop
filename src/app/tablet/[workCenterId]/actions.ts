@@ -1,7 +1,14 @@
 'use server';
+import { eq } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
 import { db } from '@/db/db';
-import { maintenanceRequest, qualityDefect, MAINTENANCE_CATEGORIES, QUALITY_DEFECT_CATEGORIES } from '@/db/schema';
+import {
+  maintenanceRequest,
+  qualityDefect,
+  workOrderOperation,
+  MAINTENANCE_CATEGORIES,
+  QUALITY_DEFECT_CATEGORIES,
+} from '@/db/schema';
 import { applyEvent } from '@/db/operations';
 import type { MaintenanceCategory, OperationEventType, QualityDefectCategory } from '@/db/schema';
 
@@ -37,6 +44,14 @@ export async function reportMaintenanceAction(
   const note = (formData.get('note') as string | null) || null;
   const reportedBy = String(formData.get('operatorId') ?? '').trim() || 'unknown';
 
+  if (operationId !== null) {
+    const [op] = await db
+      .select({ wcId: workOrderOperation.workCenterId })
+      .from(workOrderOperation)
+      .where(eq(workOrderOperation.id, operationId));
+    if (!op || op.wcId !== workCenterId) return { error: 'Operation does not belong to this work center' };
+  }
+
   try {
     await db.insert(maintenanceRequest).values({
       workCenterId,
@@ -63,6 +78,12 @@ export async function rejectWithDefectAction(
   const operatorIdRaw = String(formData.get('operatorId') ?? '').trim();
   const operatorId = operatorIdRaw || undefined;
   const reportedBy = operatorId ?? 'unknown';
+
+  const [op] = await db
+    .select({ wcId: workOrderOperation.workCenterId })
+    .from(workOrderOperation)
+    .where(eq(workOrderOperation.id, operationId));
+  if (!op || op.wcId !== Number(workCenterId)) return { error: 'Operation does not belong to this work center' };
 
   try {
     const { eventId } = await applyEvent(operationId, 'REJECT', { operatorId });
