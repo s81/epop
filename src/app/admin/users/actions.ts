@@ -18,6 +18,9 @@ export async function saveUser(
   const role = formData.get('role') as UserRole;
   const password = ((formData.get('password') as string) ?? '').trim();
 
+  if (!username && !id) return { error: 'Username is required' };
+  if (!displayName) return { error: 'Display name is required' };
+
   if (!USER_ROLES.includes(role)) return { error: 'Invalid role' };
 
   try {
