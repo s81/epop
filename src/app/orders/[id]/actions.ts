@@ -35,11 +35,11 @@ export async function addLine(_prev: unknown, formData: FormData) {
 }
 
 export async function deleteLine(formData: FormData) {
+  await requireRole('DATA_ENTRY');
   const lineId = Number(formData.get('lineId'));
   const workOrderId = Number(formData.get('workOrderId'));
 
   try {
-    await requireRole('DATA_ENTRY');
     await db.transaction(async (tx) => {
       const [order] = await tx
         .select({ status: workOrder.status })
