@@ -25,7 +25,8 @@ export async function loginAction(
 
   await createSessionCookie(found.id, found.role, found.displayName);
 
-  const next = ((formData.get('next') as string) || '').replace(/[^a-z0-9/_-]/gi, '');
+  const raw = ((formData.get('next') as string) || '').replace(/[^a-z0-9/_-]/gi, '');
+  const next = raw.startsWith('/') && !raw.startsWith('//') ? raw : '';
   redirect(next || '/admin/departments');
 }
 
