@@ -1,7 +1,7 @@
 'use server';
 import { revalidatePath } from 'next/cache';
 import { db } from '@/db/db';
-import { maintenanceRequest, qualityDefect } from '@/db/schema';
+import { maintenanceRequest, qualityDefect, MAINTENANCE_CATEGORIES, QUALITY_DEFECT_CATEGORIES } from '@/db/schema';
 import { applyEvent } from '@/db/operations';
 import type { MaintenanceCategory, OperationEventType, QualityDefectCategory } from '@/db/schema';
 
@@ -10,6 +10,7 @@ export async function applyEventAction(
   formData: FormData,
 ): Promise<{ error: string } | null> {
   const operationId = Number(formData.get('operationId'));
+  if (!Number.isInteger(operationId) || operationId <= 0) return { error: 'Invalid operationId' };
   const eventType = formData.get('eventType') as OperationEventType;
   const workCenterId = formData.get('workCenterId') as string;
   const operatorIdRaw = String(formData.get('operatorId') ?? '').trim();
@@ -32,6 +33,7 @@ export async function reportMaintenanceAction(
   const operationIdRaw = formData.get('operationId');
   const operationId = operationIdRaw ? Number(operationIdRaw) : null;
   const category = formData.get('category') as MaintenanceCategory;
+  if (!MAINTENANCE_CATEGORIES.includes(category)) return { error: 'Invalid category' };
   const note = (formData.get('note') as string | null) || null;
   const reportedBy = String(formData.get('operatorId') ?? '').trim() || 'unknown';
 
@@ -54,7 +56,9 @@ export async function rejectWithDefectAction(
   formData: FormData,
 ): Promise<{ error: string } | null> {
   const operationId = Number(formData.get('operationId'));
+  if (!Number.isInteger(operationId) || operationId <= 0) return { error: 'Invalid operationId' };
   const defectCategory = formData.get('defectCategory') as QualityDefectCategory;
+  if (!QUALITY_DEFECT_CATEGORIES.includes(defectCategory)) return { error: 'Invalid defect category' };
   const workCenterId = formData.get('workCenterId') as string;
   const operatorIdRaw = String(formData.get('operatorId') ?? '').trim();
   const operatorId = operatorIdRaw || undefined;
