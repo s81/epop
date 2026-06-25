@@ -1,9 +1,10 @@
 'use client';
-import { useState, useEffect, useActionState } from 'react';
+import { useState, useEffect, useActionState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import type { OperationStatus, OperationEventType } from '@/db/schema';
-import type { applyEventAction } from './actions';
+import type { applyEventAction, reportMaintenanceAction, rejectWithDefectAction } from './actions';
+import { ConfirmModal } from './ConfirmModal';
 
 // ---- Types ----
 
@@ -67,6 +68,20 @@ const EVENT_LABEL: Record<OperationEventType, string> = {
   REJECT: 'رفض',
 };
 
+const MAINTENANCE_CATEGORIES = [
+  { value: 'MECHANICAL', labelAr: 'ميكانيكي', labelEn: 'Mechanical' },
+  { value: 'ELECTRICAL', labelAr: 'كهربائي',  labelEn: 'Electrical' },
+  { value: 'TOOLING',    labelAr: 'أدوات',    labelEn: 'Tooling' },
+  { value: 'OTHER',      labelAr: 'أخرى',     labelEn: 'Other' },
+];
+
+const DEFECT_CATEGORIES = [
+  { value: 'DIMENSIONAL', labelAr: 'أبعاد',   labelEn: 'Dimensional' },
+  { value: 'SURFACE',     labelAr: 'سطح',     labelEn: 'Surface / Paint' },
+  { value: 'ASSEMBLY',    labelAr: 'تجميع',   labelEn: 'Assembly' },
+  { value: 'OTHER',       labelAr: 'أخرى',    labelEn: 'Other' },
+];
+
 // ---- ActionForm helper ----
 
 function ActionForm({
@@ -106,24 +121,31 @@ function ActionForm({
 
 // ---- Main component ----
 
+type Modal = 'maintenance' | 'reject' | null;
+
 export function TabletClient({
   workCenter,
   queue,
   events,
   onAction,
+  onMaintenance,
+  onRejectWithDefect,
 }: {
   workCenter: WorkCenter;
   queue: QueueItem[];
   events: EventItem[];
   onAction: typeof applyEventAction;
+  onMaintenance: typeof reportMaintenanceAction;
+  onRejectWithDefect: typeof rejectWithDefectAction;
 }) {
   const router = useRouter();
   const [operatorId, setOperatorId] = useState('');
   const [operatorError, setOperatorError] = useState(false);
   const [actionState, dispatchAction] = useActionState(onAction, null);
   const [displayError, setDisplayError] = useState<string | null>(null);
+  const [modal, setModal] = useState<Modal>(null);
+  const [isPending, startTransition] = useTransition();
 
-  // Poll every 8s: clear error + refresh RSC data
   useEffect(() => {
     const id = setInterval(() => {
       setDisplayError(null);
@@ -132,7 +154,6 @@ export function TabletClient({
     return () => clearInterval(id);
   }, [router]);
 
-  // Sync action error → displayError; immediate refresh on error (race recovery)
   useEffect(() => {
     if (actionState?.error) {
       setDisplayError(actionState.error);
@@ -153,8 +174,69 @@ export function TabletClient({
     setDisplayError(null);
   }
 
+  function handleRejectClick() {
+    if (!operatorId.trim()) {
+      setOperatorError(true);
+      return;
+    }
+    setOperatorError(false);
+    setModal('reject');
+  }
+
+  function handleMaintenanceClick() {
+    setModal('maintenance');
+  }
+
+  function handleMaintenanceConfirm(category: string, note?: string) {
+    startTransition(async () => {
+      const fd = new FormData();
+      fd.append('workCenterId', String(workCenter.id));
+      if (active) fd.append('operationId', String(active.id));
+      fd.append('category', category);
+      if (note) fd.append('note', note);
+      fd.append('operatorId', operatorId);
+      const result = await onMaintenance(null, fd);
+      setModal(null);
+      if (result?.error) setDisplayError(result.error);
+    });
+  }
+
+  function handleRejectConfirm(defectCategory: string) {
+    if (!active) return;
+    startTransition(async () => {
+      const fd = new FormData();
+      fd.append('operationId', String(active.id));
+      fd.append('defectCategory', defectCategory);
+      fd.append('workCenterId', String(workCenter.id));
+      fd.append('operatorId', operatorId);
+      const result = await onRejectWithDefect(null, fd);
+      setModal(null);
+      if (result?.error) setDisplayError(result.error);
+      router.refresh();
+    });
+  }
+
   return (
     <div dir="rtl" className="bg-gray-950 text-white min-h-screen flex flex-col">
+      {/* Modals */}
+      {modal === 'maintenance' && (
+        <ConfirmModal
+          title="نوع العطل / Problem Type"
+          categories={MAINTENANCE_CATEGORIES}
+          noteField
+          onConfirm={handleMaintenanceConfirm}
+          onCancel={() => setModal(null)}
+        />
+      )}
+      {modal === 'reject' && (
+        <ConfirmModal
+          title="سبب الرفض / Defect Type"
+          categories={DEFECT_CATEGORIES}
+          onConfirm={handleRejectConfirm}
+          onCancel={() => setModal(null)}
+        />
+      )}
+
       {/* Header */}
       <header className="flex items-center justify-between px-6 py-4 bg-gray-900 border-b border-gray-800 flex-shrink-0">
         <div>
@@ -200,7 +282,7 @@ export function TabletClient({
               </span>
             </div>
 
-            {/* FSM buttons — one form per event type */}
+            {/* FSM buttons */}
             <div className="flex gap-3">
               {active.status === 'QUEUED' && (
                 <ActionForm
@@ -262,16 +344,14 @@ export function TabletClient({
                     dispatch={dispatchAction}
                     onSubmit={handleActionSubmit}
                   />
-                  <ActionForm
-                    op={active}
-                    eventType="REJECT"
-                    label="رفض / Reject"
-                    colorClass="bg-red-600 hover:bg-red-500"
-                    workCenterId={workCenter.id}
-                    operatorId={operatorId}
-                    dispatch={dispatchAction}
-                    onSubmit={handleActionSubmit}
-                  />
+                  <button
+                    type="button"
+                    onClick={handleRejectClick}
+                    disabled={isPending}
+                    className="flex-1 min-h-[72px] text-xl font-bold rounded-xl text-white bg-red-600 hover:bg-red-500 disabled:opacity-50 transition-colors"
+                  >
+                    رفض / Reject
+                  </button>
                 </>
               )}
             </div>
@@ -349,10 +429,18 @@ export function TabletClient({
       </div>
 
       {/* Footer nav */}
-      <footer className="px-6 py-3 bg-gray-900 border-t border-gray-800 flex-shrink-0">
+      <footer className="px-6 py-3 bg-gray-900 border-t border-gray-800 flex-shrink-0 flex items-center justify-between">
         <Link href="/tablet" className="text-xs text-gray-600 hover:text-gray-400 transition-colors">
           ← محطات العمل / Work Centers
         </Link>
+        <button
+          type="button"
+          onClick={handleMaintenanceClick}
+          disabled={isPending}
+          className="text-xs text-amber-500 hover:text-amber-400 disabled:opacity-50 transition-colors font-medium"
+        >
+          ⚠ إبلاغ عن عطل / Report Maintenance
+        </button>
       </footer>
     </div>
   );

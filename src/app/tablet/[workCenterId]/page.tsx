@@ -11,7 +11,7 @@ import {
   type OperationStatus,
 } from '@/db/schema';
 import { TabletClient } from './client';
-import { applyEventAction } from './actions';
+import { applyEventAction, reportMaintenanceAction, rejectWithDefectAction } from './actions';
 
 const OPEN_STATUSES: OperationStatus[] = ['QUEUED', 'IN_PROGRESS', 'PAUSED', 'PENDING_QC'];
 
@@ -36,7 +36,6 @@ export default async function TabletPage({
   if (!wc) notFound();
 
   const [queue, events] = await Promise.all([
-    // Queue query — hits ix_op_open partial index
     db
       .select({
         id: workOrderOperation.id,
@@ -60,7 +59,6 @@ export default async function TabletPage({
       )
       .orderBy(asc(workOrderOperation.sequence)),
 
-    // Event feed query — last 15 events for this work center
     db
       .select({
         id: operationEvent.id,
@@ -85,6 +83,8 @@ export default async function TabletPage({
       queue={queue}
       events={events}
       onAction={applyEventAction}
+      onMaintenance={reportMaintenanceAction}
+      onRejectWithDefect={rejectWithDefectAction}
     />
   );
 }
