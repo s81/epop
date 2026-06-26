@@ -51,7 +51,12 @@ describe('user table', () => {
       testDb
         .insert(schema.user)
         .values({ username: 'bob', displayName: 'Bob2', passwordHash: 'h', role: 'VIEWER' }),
-    ).rejects.toThrow(/UNIQUE/);
+    ).rejects.toSatisfy(
+      (e: unknown) =>
+        e instanceof Error &&
+        (e.message.includes('UNIQUE') ||
+          (e.cause instanceof Error && e.cause.message.includes('UNIQUE'))),
+    );
   });
 
   it('rejects invalid role', async () => {
