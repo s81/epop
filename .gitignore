@@ -8,3 +8,7 @@ node_modules/
 tsconfig.tsbuildinfo
 dist/
 .superpowers/
+.claude/
+.playwright-mcp/
+summary.md
+
