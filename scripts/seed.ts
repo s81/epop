@@ -11,7 +11,7 @@ import {
   department, workCenter, model, colorFamily, color, routingStep,
   workOrder, workOrderLine, workOrderOperation, operationEvent,
   shiftCalendar,
-  user,
+  user, materialCategory, material, stockTransaction,
 } from '../src/db/schema';
 import { releaseWorkOrder, applyEvent } from '../src/db/operations';
 import { clearSchedule, runScheduler } from '../src/db/scheduler';
@@ -284,6 +284,86 @@ async function main() {
   console.log(`  ~ Scheduled ${schedResult.scheduled} operations`);
   if (schedResult.errors.length > 0) {
     console.log(`  ! Errors: ${schedResult.errors.join(', ')}`);
+  }
+
+  // ── Material Categories ────────────────────────────────────────────
+  const catData = [
+    { code: 'WOD', nameAr: 'خشب',           nameEn: 'Wood' },
+    { code: 'MET', nameAr: 'معدن',           nameEn: 'Metal' },
+    { code: 'FAB', nameAr: 'قماش',           nameEn: 'Fabric' },
+    { code: 'HRD', nameAr: 'معدات',          nameEn: 'Hardware' },
+    { code: 'PKG', nameAr: 'تغليف',          nameEn: 'Packaging' },
+  ];
+  const cats: Record<string, typeof materialCategory.$inferSelect> = {};
+  for (const c of catData) {
+    const [row] = await db.select().from(materialCategory).where(eq(materialCategory.code, c.code));
+    cats[c.code] = await upsert(`Material Category ${c.code}`, row, async () => {
+      const [r] = await db.insert(materialCategory).values(c).returning();
+      return r;
+    });
+  }
+
+  // ── Materials ──────────────────────────────────────────────────────
+  const matData = [
+    { code: 'MDF-18',  nameAr: 'إم دي إف 18مم',    nameEn: 'MDF 18mm',          unit: 'sheet', cat: 'WOD' },
+    { code: 'MDF-25',  nameAr: 'إم دي إف 25مم',    nameEn: 'MDF 25mm',          unit: 'sheet', cat: 'WOD' },
+    { code: 'PB-18',   nameAr: 'خشب مضغوط 18مم',   nameEn: 'Particle Board 18mm', unit: 'sheet', cat: 'WOD' },
+    { code: 'STL-LG',  nameAr: 'أرجل معدنية',       nameEn: 'Steel Legs',        unit: 'pcs',   cat: 'MET' },
+    { code: 'STL-FR',  nameAr: 'إطار معدني',        nameEn: 'Steel Frame',       unit: 'pcs',   cat: 'MET' },
+    { code: 'FBR-BLK', nameAr: 'قماش أسود',         nameEn: 'Black Fabric',      unit: 'm²',    cat: 'FAB' },
+    { code: 'FBR-GRY', nameAr: 'قماش رمادي',        nameEn: 'Gray Fabric',       unit: 'm²',    cat: 'FAB' },
+    { code: 'SCR-8',   nameAr: 'براغي 8مم',         nameEn: 'Screws 8mm',        unit: 'pcs',   cat: 'HRD' },
+    { code: 'HNG-SM',  nameAr: 'مفصلات صغيرة',      nameEn: 'Hinges Small',      unit: 'pcs',   cat: 'HRD' },
+    { code: 'BOX-LG',  nameAr: 'كرتون كبير',        nameEn: 'Large Carton Box',  unit: 'pcs',   cat: 'PKG' },
+  ];
+  const mats: Record<string, typeof material.$inferSelect> = {};
+  for (const m of matData) {
+    const [row] = await db.select().from(material).where(eq(material.code, m.code));
+    mats[m.code] = await upsert(`Material ${m.code}`, row, async () => {
+      const [r] = await db.insert(material).values({
+        code: m.code,
+        nameAr: m.nameAr,
+        nameEn: m.nameEn,
+        unit: m.unit,
+        categoryId: cats[m.cat].id,
+      }).returning();
+      return r;
+    });
+  }
+
+  // ── Stock Transactions ─────────────────────────────────────────────
+  const txData = [
+    { mat: 'MDF-18', type: 'RECEIPT' as const, qty: 200, ref: 'PO-2026-045' },
+    { mat: 'MDF-25', type: 'RECEIPT' as const, qty: 150, ref: 'PO-2026-045' },
+    { mat: 'PB-18',  type: 'RECEIPT' as const, qty: 300, ref: 'PO-2026-046' },
+    { mat: 'STL-LG', type: 'RECEIPT' as const, qty: 500, ref: 'PO-2026-047' },
+    { mat: 'STL-FR', type: 'RECEIPT' as const, qty: 200, ref: 'PO-2026-047' },
+    { mat: 'FBR-BLK', type: 'RECEIPT' as const, qty: 100, ref: 'PO-2026-048' },
+    { mat: 'FBR-GRY', type: 'RECEIPT' as const, qty: 80,  ref: 'PO-2026-048' },
+    { mat: 'SCR-8',  type: 'RECEIPT' as const, qty: 2000, ref: 'PO-2026-049' },
+    { mat: 'HNG-SM', type: 'RECEIPT' as const, qty: 400,  ref: 'PO-2026-049' },
+    { mat: 'BOX-LG', type: 'RECEIPT' as const, qty: 100,  ref: 'PO-2026-050' },
+  ];
+  for (const t of txData) {
+    const [existing] = await db.select()
+      .from(stockTransaction)
+      .where(and(
+        eq(stockTransaction.materialId, mats[t.mat].id),
+        eq(stockTransaction.reference, t.ref),
+      ))
+      .limit(1);
+    if (!existing) {
+      await db.insert(stockTransaction).values({
+        materialId: mats[t.mat].id,
+        type: t.type,
+        quantity: t.qty,
+        reference: t.ref,
+        createdBy: 'seed',
+      });
+      console.log(`  + Stock tx ${t.type} ${t.mat} x${t.qty}`);
+    } else {
+      console.log(`  · Stock tx ${t.type} ${t.mat} x${t.qty}`);
+    }
   }
 
   console.log('\n── Seed complete ──');

@@ -5,7 +5,7 @@ CREATE TABLE IF NOT EXISTS material_category (
   name_en TEXT NOT NULL,
   created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
 );
-
+--> statement-breakpoint
 CREATE TABLE IF NOT EXISTS material (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   code TEXT NOT NULL UNIQUE,
@@ -15,7 +15,7 @@ CREATE TABLE IF NOT EXISTS material (
   category_id INTEGER NOT NULL REFERENCES material_category(id),
   created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
 );
-
+--> statement-breakpoint
 CREATE TABLE IF NOT EXISTS stock_transaction (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   material_id INTEGER NOT NULL REFERENCES material(id),
@@ -27,6 +27,7 @@ CREATE TABLE IF NOT EXISTS stock_transaction (
   created_by TEXT,
   created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
 );
-
+--> statement-breakpoint
 CREATE INDEX IF NOT EXISTS idx_stock_tx_material ON stock_transaction(material_id);
+--> statement-breakpoint
 CREATE INDEX IF NOT EXISTS idx_stock_tx_work_order ON stock_transaction(work_order_id);
