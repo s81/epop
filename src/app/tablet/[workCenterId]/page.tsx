@@ -13,7 +13,7 @@ import {
 import { TabletClient } from './client';
 import { applyEventAction, reportMaintenanceAction, rejectWithDefectAction } from './actions';
 
-const OPEN_STATUSES: OperationStatus[] = ['QUEUED', 'IN_PROGRESS', 'PAUSED', 'PENDING_QC'];
+const OPEN_STATUSES: OperationStatus[] = ['QUEUED', 'IN_PROGRESS', 'PAUSED', 'PENDING_QC', 'REJECTED'];
 
 export default async function TabletPage({
   params,
@@ -46,6 +46,7 @@ export default async function TabletPage({
         modelCode: model.code,
         orderNumber: workOrder.orderNumber,
         quantity: workOrderLine.quantity,
+        startedAt: workOrderOperation.startedAt,
       })
       .from(workOrderOperation)
       .innerJoin(workOrderLine, eq(workOrderLine.id, workOrderOperation.workOrderLineId))

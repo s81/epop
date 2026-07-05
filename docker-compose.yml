@@ -1,0 +1,13 @@
+services:
+  epop:
+    build: .
+    ports:
+      - "3000:3000"
+    volumes:
+      - epop-data:/data
+    environment:
+      - SESSION_SECRET=${SESSION_SECRET:-change-this-in-production}
+      - TURSO_DB_URL=file:/data/local.db
+      - NODE_ENV=production
+volumes:
+  epop-data:

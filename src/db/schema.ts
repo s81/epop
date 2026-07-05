@@ -23,6 +23,7 @@ export const OPERATION_EVENT_TYPES = [
   'FINISH',
   'ACCEPT',
   'REJECT',
+  'RESTART',
 ] as const;
 export type OperationEventType = (typeof OPERATION_EVENT_TYPES)[number];
 
@@ -222,6 +223,31 @@ export const qualityDefect = sqliteTable('quality_defect', {
     .references(() => operationEvent.id),
   category: text('category', { enum: QUALITY_DEFECT_CATEGORIES }).notNull(),
   reportedBy: text('reported_by').notNull(),
+  createdAt: text('created_at')
+    .notNull()
+    .default(sql`(strftime('%Y-%m-%dT%H:%M:%fZ','now'))`),
+});
+
+// --- Shift Calendar ---
+
+export const shiftCalendar = sqliteTable('shift_calendar', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  date: text('date').notNull().unique(),
+  startTime: text('start_time').notNull().default('08:00'),
+  endTime: text('end_time').notNull().default('16:00'),
+  isWorkingDay: integer('is_working_day', { mode: 'boolean' }).notNull().default(true),
+  createdAt: text('created_at')
+    .notNull()
+    .default(sql`(strftime('%Y-%m-%dT%H:%M:%fZ','now'))`),
+});
+
+// --- Production Targets ---
+
+export const productionTarget = sqliteTable('production_target', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  workCenterId: integer('work_center_id').notNull().references(() => workCenter.id),
+  date: text('date').notNull(),
+  targetQuantity: integer('target_quantity').notNull(),
   createdAt: text('created_at')
     .notNull()
     .default(sql`(strftime('%Y-%m-%dT%H:%M:%fZ','now'))`),

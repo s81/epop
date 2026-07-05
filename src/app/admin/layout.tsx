@@ -1,16 +1,25 @@
 import Link from 'next/link';
 import { getSession } from '@/lib/session';
 import { logoutAction } from '@/app/login/actions';
+import NotificationBar from './notification-bar';
 
 const NAV = [
+  { href: '/admin',                label: 'Dashboard' },
+  { href: '/admin/orders',         label: 'Orders' },
   { href: '/admin/departments',    label: 'Departments' },
   { href: '/admin/work-centers',   label: 'Work Centers' },
   { href: '/admin/models',         label: 'Models' },
   { href: '/admin/color-families', label: 'Color Families' },
   { href: '/admin/colors',         label: 'Colors' },
   { href: '/admin/routing',        label: 'Routing' },
-  { href: '/admin/maintenance',    label: 'Maintenance' },
-  { href: '/admin/quality',        label: 'Quality' },
+  { href: '/admin/maintenance',    label: 'Maintenance / الصيانة' },
+  { href: '/admin/quality',        label: 'Quality / الجودة' },
+  { href: '/admin/audit',          label: 'Audit Log / سجل الأحداث' },
+  { href: '/admin/scheduler',      label: 'Scheduler' },
+  { href: '/admin/shifts',         label: 'Shifts' },
+  { href: '/admin/targets',        label: 'Targets / الأهداف' },
+  { href: '/admin/labor',          label: 'Labor / العمل' },
+  { href: '/admin/reports',        label: 'Reports / التقارير' },
 ];
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
@@ -18,7 +27,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
 
   return (
     <div className="flex h-screen overflow-hidden">
-      <aside className="w-52 bg-gray-900 text-white flex-shrink-0 flex flex-col">
+      <aside className="w-52 bg-gray-900 text-white flex-shrink-0 flex flex-col no-print">
         <div className="px-4 py-4 text-sm font-semibold tracking-wide text-gray-300 border-b border-gray-700">
           e-pop · Master Data
         </div>
@@ -56,7 +65,10 @@ export default async function AdminLayout({ children }: { children: React.ReactN
           </div>
         )}
       </aside>
-      <main className="flex-1 overflow-auto p-8">{children}</main>
+      <main className="flex-1 overflow-auto">
+        <NotificationBar />
+        <div className="p-8">{children}</div>
+      </main>
     </div>
   );
 }

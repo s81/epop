@@ -62,4 +62,26 @@ describe('middleware', () => {
     const res = await middleware(req('/admin/users', token));
     expect(res.status).not.toBe(307);
   });
+
+  it('redirects /admin/foo to /login when no cookie', async () => {
+    const res = await middleware(req('/admin/foo'));
+    expect(res.status).toBe(307);
+    expect(res.headers.get('location')).toContain('/login');
+  });
+
+  it('passes / (home) with valid VIEWER token', async () => {
+    const token = await makeToken('VIEWER');
+    const res = await middleware(req('/', token));
+    expect(res.status).not.toBe(307);
+  });
+
+  it('passes /api/operations without auth check', async () => {
+    const res = await middleware(req('/api/operations'));
+    expect(res.status).not.toBe(307);
+  });
+
+  it('passes /_next/static/chunks/main.js without auth check', async () => {
+    const res = await middleware(req('/_next/static/chunks/main.js'));
+    expect(res.status).not.toBe(307);
+  });
 });

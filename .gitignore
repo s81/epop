@@ -10,5 +10,7 @@ dist/
 .superpowers/
 .claude/
 .playwright-mcp/
+.opencode/
+graphify-out/
 summary.md
 
