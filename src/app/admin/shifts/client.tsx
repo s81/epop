@@ -1,6 +1,6 @@
 'use client';
 import { useActionState, useEffect, useState } from 'react';
-import { upsertShift, deleteShift } from './actions';
+import { upsertShift, deleteShift, bulkCreateShifts } from './actions';
 
 const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
@@ -118,6 +118,114 @@ function nextMonth(month: string): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
 }
 
+function BulkForm({
+  onSuccess,
+  onCancel,
+}: {
+  onSuccess: () => void;
+  onCancel: () => void;
+}) {
+  const [state, action, pending] = useActionState(bulkCreateShifts, null);
+
+  useEffect(() => {
+    if (state && 'success' in state) onSuccess();
+  }, [state]);
+
+  return (
+    <form action={action} className="space-y-4">
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Year / السنة</label>
+          <input
+            type="number"
+            name="year"
+            defaultValue={new Date().getFullYear()}
+            required
+            className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Month / الشهر</label>
+          <select
+            name="month"
+            required
+            className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+          >
+            {MONTH_NAMES.map((name, i) => (
+              <option key={i} value={i + 1}>{name}</option>
+            ))}
+          </select>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Start / البداية</label>
+          <input
+            type="time"
+            name="startTime"
+            defaultValue="08:00"
+            required
+            className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">End / النهاية</label>
+          <input
+            type="time"
+            name="endTime"
+            defaultValue="16:00"
+            required
+            className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+        </div>
+      </div>
+
+      <fieldset>
+        <legend className="text-sm font-medium text-gray-700 mb-2">Working Days / أيام العمل</legend>
+        <div className="flex flex-wrap gap-3">
+          {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((name, i) => (
+            <label key={i} className="flex items-center gap-1.5 text-sm text-gray-700">
+              <input
+                type="checkbox"
+                name="workingDays"
+                value={i}
+                defaultChecked={i >= 1 && i <= 5}
+                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+              />
+              {name}
+            </label>
+          ))}
+        </div>
+      </fieldset>
+
+      {state && 'error' in state && (
+        <p className="text-red-500 text-sm">{state.error}</p>
+      )}
+      {state && 'success' in state && (
+        <p className="text-green-600 text-sm">{state.count} shifts created</p>
+      )}
+
+      <div className="flex justify-end gap-2 pt-2">
+        <button
+          type="button"
+          onClick={onCancel}
+          className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800 transition-colors"
+        >
+          Cancel / إلغاء
+        </button>
+        <button
+          type="submit"
+          disabled={pending}
+          className="bg-blue-600 text-white px-5 py-2 rounded-md text-sm font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors"
+        >
+          {pending ? 'Generating…' : 'Generate / إنشاء'}
+        </button>
+      </div>
+    </form>
+  );
+}
+
 export function ShiftsClient({
   data,
   month,
@@ -128,6 +236,7 @@ export function ShiftsClient({
   onDelete: typeof deleteShift;
 }) {
   const [editing, setEditing] = useState<ShiftRow | null | 'new'>(null);
+  const [bulkOpen, setBulkOpen] = useState(false);
 
   const [y, m] = month.split('-').map(Number);
   const monthLabel = `${MONTH_NAMES[m - 1]} ${y} / ${ARABIC_MONTHS[m - 1]} ${y}`;
@@ -139,12 +248,20 @@ export function ShiftsClient({
         <h1 className="text-xl font-semibold text-gray-900">
           Shift Calendar / تقويم المناوبة
         </h1>
-        <button
-          onClick={() => setEditing('new')}
-          className="bg-blue-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-blue-700 transition-colors"
-        >
-          + Add Shift / إضافة وردية
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={() => setBulkOpen(true)}
+            className="border border-gray-300 text-gray-700 px-4 py-2 rounded-md text-sm font-medium hover:bg-gray-50 transition-colors"
+          >
+            Generate Month / إنشاء شهر
+          </button>
+          <button
+            onClick={() => setEditing('new')}
+            className="bg-blue-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-blue-700 transition-colors"
+          >
+            + Add Shift / إضافة وردية
+          </button>
+        </div>
       </div>
 
       <p className="text-sm text-gray-500 mb-4">
@@ -177,6 +294,20 @@ export function ShiftsClient({
               item={editing === 'new' ? null : editing}
               onSuccess={() => setEditing(null)}
               onCancel={() => setEditing(null)}
+            />
+          </div>
+        </div>
+      )}
+
+      {bulkOpen && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-md">
+            <h2 className="text-lg font-semibold mb-4">
+              Generate Month / إنشاء شهر
+            </h2>
+            <BulkForm
+              onSuccess={() => setBulkOpen(false)}
+              onCancel={() => setBulkOpen(false)}
             />
           </div>
         </div>

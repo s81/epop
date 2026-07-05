@@ -10,8 +10,11 @@ export async function createWorkOrder(_prev: unknown, formData: FormData) {
   try {
     await requireRole('DATA_ENTRY');
 
-    const modelId = Number(formData.get('modelId'));
-    const quantity = Number(formData.get('quantity'));
+    const modelIds = formData.getAll('modelId').map((v) => Number(v));
+    const quantities = formData.getAll('quantity').map((v) => Number(v));
+    const colorIds = formData.getAll('colorId').map((v) => (v ? Number(v) : null));
+
+    if (modelIds.length === 0) return { error: 'At least one line is required' };
 
     const year = new Date().getFullYear();
     const prefix = `PO-${year}-`;
@@ -36,11 +39,14 @@ export async function createWorkOrder(_prev: unknown, formData: FormData) {
       .values({ orderNumber })
       .returning({ id: workOrder.id });
 
-    await db.insert(workOrderLine).values({
-      workOrderId: wo.id,
-      modelId,
-      quantity,
-    });
+    await db.insert(workOrderLine).values(
+      modelIds.map((modelId, i) => ({
+        workOrderId: wo.id,
+        modelId,
+        quantity: quantities[i],
+        colorId: colorIds[i],
+      })),
+    );
 
     revalidatePath('/admin/orders');
     return { success: true, id: wo.id };
@@ -92,6 +98,7 @@ export async function updateOrderLines(_prev: unknown, formData: FormData) {
 
     const modelIds = formData.getAll('modelId').map((v) => Number(v));
     const quantities = formData.getAll('quantity').map((v) => Number(v));
+    const colorIds = formData.getAll('colorId').map((v) => (v ? Number(v) : null));
 
     if (modelIds.length === 0) {
       return { error: 'At least one line is required' };
@@ -109,6 +116,7 @@ export async function updateOrderLines(_prev: unknown, formData: FormData) {
         workOrderId: orderId,
         modelId,
         quantity: quantities[i],
+        colorId: colorIds[i],
       })),
     );
 

@@ -1,5 +1,6 @@
 import { getLaborHours } from '@/db/labor';
 import Link from 'next/link';
+import { LaborExportButton } from './labor-export';
 
 function formatDate(d: Date): string {
   const y = d.getFullYear();
@@ -106,6 +107,10 @@ export default async function LaborPage({
     operatorTotals.set(opId, total);
   }
 
+  const allDetails = Array.from(byOperator.entries()).flatMap(([, dayMap]) =>
+    Array.from(dayMap.values()).flatMap((entry) => entry.details),
+  );
+
   const sortedOperators = Array.from(byOperator.keys()).sort(
     (a, b) => (operatorTotals.get(b) ?? 0) - (operatorTotals.get(a) ?? 0),
   );
@@ -115,6 +120,7 @@ export default async function LaborPage({
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-xl font-semibold text-gray-900">Labor Hours / ساعات العمل</h1>
         <div className="flex items-center gap-3">
+          <LaborExportButton details={allDetails} from={from} to={to} />
           <Link
             href={`/admin/labor?from=${prevFrom}&to=${prevTo}`}
             className="px-3 py-1.5 text-sm border border-gray-300 rounded hover:bg-gray-50 transition-colors"

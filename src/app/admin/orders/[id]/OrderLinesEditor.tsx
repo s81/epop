@@ -9,9 +9,18 @@ type Line = {
   modelNameEn: string;
   quantity: number;
   modelId?: number;
+  colorId?: number | null;
+  colorCode?: string | null;
+  colorNameEn?: string | null;
 };
 
 type Model = {
+  id: number;
+  code: string;
+  nameEn: string;
+};
+
+type Color = {
   id: number;
   code: string;
   nameEn: string;
@@ -21,16 +30,18 @@ export function OrderLinesEditor({
   orderId,
   initialLines,
   allModels,
+  allColors,
   status,
 }: {
   orderId: number;
   initialLines: Line[];
   allModels: Model[];
+  allColors: Color[];
   status: string;
 }) {
   const router = useRouter();
   const [editing, setEditing] = useState(false);
-  const [lines, setLines] = useState<{ modelId: string; quantity: string; key: number }[]>([]);
+  const [lines, setLines] = useState<{ modelId: string; quantity: string; colorId: string; key: number }[]>([]);
   const [state, formAction, pending] = useActionState(updateOrderLines, null);
 
   useEffect(() => {
@@ -66,9 +77,10 @@ export function OrderLinesEditor({
                   ? initialLines.map((l) => ({
                       modelId: String(l.modelId ?? ''),
                       quantity: String(l.quantity),
+                      colorId: String(l.colorId ?? ''),
                       key: Math.random(),
                     }))
-                  : [{ modelId: '', quantity: '1', key: Math.random() }],
+                  : [{ modelId: '', quantity: '1', colorId: '', key: Math.random() }],
               );
               setEditing(true);
             }}
@@ -103,6 +115,9 @@ export function OrderLinesEditor({
                   Model / الموديل
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                  Color / اللون
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">
                   Qty / الكمية
                 </th>
                 <th className="px-4 py-3 w-10"></th>
@@ -127,6 +142,25 @@ export function OrderLinesEditor({
                       {allModels.map((m) => (
                         <option key={m.id} value={String(m.id)}>
                           {m.code} — {m.nameEn}
+                        </option>
+                      ))}
+                    </select>
+                  </td>
+                  <td className="px-4 py-3">
+                    <select
+                      name="colorId"
+                      value={line.colorId}
+                      onChange={(e) => {
+                        const next = [...lines];
+                        next[i] = { ...next[i], colorId: e.target.value };
+                        setLines(next);
+                      }}
+                      className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
+                    >
+                      <option value="">— None —</option>
+                      {allColors.map((c) => (
+                        <option key={c.id} value={String(c.id)}>
+                          {c.code} — {c.nameEn}
                         </option>
                       ))}
                     </select>
@@ -160,7 +194,7 @@ export function OrderLinesEditor({
               {lines.length === 0 && (
                 <tr>
                   <td
-                    colSpan={3}
+                    colSpan={4}
                     className="px-4 py-10 text-center text-sm text-gray-400"
                   >
                     No lines / لا توجد بنود
@@ -181,7 +215,7 @@ export function OrderLinesEditor({
             onClick={() =>
               setLines([
                 ...lines,
-                { modelId: '', quantity: '1', key: Math.random() },
+                { modelId: '', quantity: '1', colorId: '', key: Math.random() },
               ])
             }
             className="px-4 py-2 rounded-md text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 transition-colors"
@@ -222,6 +256,9 @@ function ReadOnlyTable({ lines }: { lines: Line[] }) {
               Model / الموديل
             </th>
             <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">
+              Color / اللون
+            </th>
+            <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">
               Qty / الكمية
             </th>
           </tr>
@@ -236,6 +273,16 @@ function ReadOnlyTable({ lines }: { lines: Line[] }) {
                 <span className="ml-2 text-gray-800">
                   {line.modelNameEn} / {line.modelNameAr}
                 </span>
+              </td>
+              <td className="px-4 py-3 text-gray-800">
+                {line.colorCode ? (
+                  <>
+                    <span className="font-mono text-xs text-gray-500">{line.colorCode}</span>
+                    <span className="ml-2">{line.colorNameEn}</span>
+                  </>
+                ) : (
+                  <span className="text-gray-400">—</span>
+                )}
               </td>
               <td className="px-4 py-3 text-gray-800">{line.quantity}</td>
             </tr>

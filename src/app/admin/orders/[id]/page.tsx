@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation';
 import { asc, eq } from 'drizzle-orm';
 import { db } from '@/db/db';
 import {
+  color,
   model,
   workCenter,
   workOrder,
@@ -32,6 +33,9 @@ export default async function OrderDetailPage({
     .select({
       id: workOrderLine.id,
       modelId: workOrderLine.modelId,
+      colorId: workOrderLine.colorId,
+      colorCode: color.code,
+      colorNameEn: color.nameEn,
       modelCode: model.code,
       modelNameAr: model.nameAr,
       modelNameEn: model.nameEn,
@@ -39,6 +43,7 @@ export default async function OrderDetailPage({
     })
     .from(workOrderLine)
     .innerJoin(model, eq(model.id, workOrderLine.modelId))
+    .leftJoin(color, eq(color.id, workOrderLine.colorId))
     .where(eq(workOrderLine.workOrderId, orderId))
     .orderBy(asc(model.code));
 
@@ -58,10 +63,16 @@ export default async function OrderDetailPage({
     .where(eq(workOrderLine.workOrderId, orderId))
     .orderBy(asc(workOrderOperation.sequence));
 
-  const models = await db
-    .select({ id: model.id, code: model.code, nameEn: model.nameEn })
-    .from(model)
-    .orderBy(asc(model.code));
+  const [models, colors] = await Promise.all([
+    db
+      .select({ id: model.id, code: model.code, nameEn: model.nameEn })
+      .from(model)
+      .orderBy(asc(model.code)),
+    db
+      .select({ id: color.id, code: color.code, nameEn: color.nameEn })
+      .from(color)
+      .orderBy(asc(color.code)),
+  ]);
 
   const statusBadge = (s: string) => {
     const cls =
@@ -179,6 +190,7 @@ export default async function OrderDetailPage({
         orderId={order.id}
         initialLines={lines}
         allModels={models}
+        allColors={colors}
         status={order.status}
       />
 

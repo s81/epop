@@ -1,7 +1,7 @@
 'use client';
 import { useActionState, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { upsertTarget } from './actions';
+import { upsertTarget, deleteTarget } from './actions';
 
 const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 const ARABIC_MONTHS = ['يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو', 'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'];
@@ -24,6 +24,7 @@ function TargetForm({
   onCancel: () => void;
 }) {
   const [state, action, pending] = useActionState(upsertTarget, null);
+  const [deleteState, deleteAction, deletePending] = useActionState(deleteTarget, null);
 
   const router = useRouter();
 
@@ -33,6 +34,13 @@ function TargetForm({
       router.refresh();
     }
   }, [state, onSuccess, router]);
+
+  useEffect(() => {
+    if (deleteState && 'success' in deleteState) {
+      onSuccess();
+      router.refresh();
+    }
+  }, [deleteState, onSuccess, router]);
 
   return (
     <form action={action} className="space-y-4">
@@ -66,6 +74,21 @@ function TargetForm({
       )}
 
       <div className="flex justify-end gap-2 pt-2">
+        {target && (
+          <button
+            type="button"
+            disabled={deletePending}
+            onClick={() => {
+              if (!confirm(`Delete target for ${target.date}? / حذف الهدف ليوم ${target.date}؟`)) return;
+              const f = new FormData();
+              f.set('targetId', String(target.id));
+              deleteAction(f);
+            }}
+            className="px-4 py-2 text-sm text-red-600 hover:text-red-800 transition-colors"
+          >
+            {deletePending ? 'Deleting…' : 'Delete / حذف'}
+          </button>
+        )}
         <button
           type="button"
           onClick={onCancel}
