@@ -1,6 +1,7 @@
 import { getLaborHours } from '@/db/labor';
 import Link from 'next/link';
 import { LaborExportButton } from './labor-export';
+import { LaborTable } from './labor-table';
 
 function formatDate(d: Date): string {
   const y = d.getFullYear();
@@ -32,16 +33,6 @@ function fmtHours(minutes: number): string {
   if (m === 0) return `${h}h`;
   return `${h}h ${m}m`;
 }
-
-const WEEKDAYS = [
-  'Mon / الإثنين',
-  'Tue / الثلاثاء',
-  'Wed / الأربعاء',
-  'Thu / الخميس',
-  'Fri / الجمعة',
-  'Sat / السبت',
-  'Sun / الأحد',
-];
 
 function getDatesInWeek(monday: Date): Date[] {
   const dates: Date[] = [];
@@ -142,52 +133,12 @@ export default async function LaborPage({
       {sortedOperators.length === 0 ? (
         <p className="text-sm text-gray-400">No labor data for this period / لا توجد بيانات لهذه الفترة</p>
       ) : (
-        <div className="bg-white rounded-lg border border-gray-200 overflow-hidden mb-6">
-          <table className="w-full text-sm">
-            <thead className="bg-gray-50 border-b border-gray-200">
-              <tr>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">
-                  Operator ID / معرف المشغل
-                </th>
-                {dates.map((d, i) => (
-                  <th key={i} className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">
-                    {WEEKDAYS[i]}<br />
-                    <span className="text-gray-400 font-normal">{formatDate(d)}</span>
-                  </th>
-                ))}
-                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">
-                  Total / المجموع
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {sortedOperators.map((opId) => {
-                const dayMap = byOperator.get(opId)!;
-                let weekTotal = 0;
-                const dayMinutes = dates.map((d) => {
-                  const ds = formatDate(d);
-                  const entry = dayMap.get(ds);
-                  const m = entry?.minutes ?? 0;
-                  weekTotal += m;
-                  return m;
-                });
-                return (
-                  <tr key={opId} className="hover:bg-gray-50 transition-colors">
-                    <td className="px-4 py-3 text-gray-800 font-mono font-medium">{opId}</td>
-                    {dayMinutes.map((m, i) => (
-                      <td key={i} className="px-4 py-3 text-gray-800 font-mono">
-                        {m > 0 ? fmtHours(m) : '—'}
-                      </td>
-                    ))}
-                    <td className="px-4 py-3 text-gray-800 font-mono font-semibold">
-                      {fmtHours(weekTotal)}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+        <LaborTable
+          byOperator={byOperator}
+          operatorTotals={operatorTotals}
+          sortedOperators={sortedOperators}
+          dates={dates}
+        />
       )}
 
       {sortedOperators.length > 0 && (

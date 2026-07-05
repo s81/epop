@@ -15,6 +15,7 @@ const NAV = [
   { href: '/admin/maintenance',    label: 'Maintenance / الصيانة' },
   { href: '/admin/quality',        label: 'Quality / الجودة' },
   { href: '/admin/audit',          label: 'Audit Log / سجل الأحداث' },
+  { href: '/admin/operations',     label: 'Operations / العمليات' },
   { href: '/admin/scheduler',      label: 'Scheduler' },
   { href: '/admin/shifts',         label: 'Shifts' },
   { href: '/admin/targets',        label: 'Targets / الأهداف' },

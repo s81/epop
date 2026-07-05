@@ -144,6 +144,16 @@ export default async function QualityPage({
                 </tr>
               ))}
             </tbody>
+            <tfoot>
+              <tr className="border-t border-gray-700 text-gray-400">
+                <td className="py-3 pr-4 text-xs font-semibold" colSpan={5}>
+                  Total / المجموع: {defects.length} defects
+                </td>
+                <td className="py-3 pr-4 text-xs font-semibold" colSpan={4}>
+                  {defects.filter(d => d.category === 'DIMENSIONAL').length} DIM · {defects.filter(d => d.category === 'SURFACE').length} SUR · {defects.filter(d => d.category === 'ASSEMBLY').length} ASM · {defects.filter(d => d.category === 'OTHER').length} OTH
+                </td>
+              </tr>
+            </tfoot>
           </table>
 
           <Pagination

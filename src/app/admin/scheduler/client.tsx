@@ -76,6 +76,9 @@ export function SchedulerClient({
             Shift {shiftSummary.startTime}–{shiftSummary.endTime}{' '}
             ({shiftSummary.workingDays}/{shiftSummary.totalDays} working days seeded)
           </p>
+          <p className="text-xs text-gray-400 mt-0.5">
+            {opsByStatus('QUEUED', operations)} QUEUED · {opsByStatus('IN_PROGRESS', operations)} IN_PROGRESS · {opsByStatus('COMPLETED', operations)} COMPLETED · {opsByStatus('REJECTED', operations)} REJECTED
+          </p>
         </div>
         <div className="flex gap-3 no-print">
           <ExportCsv
@@ -214,8 +217,22 @@ export function SchedulerClient({
                         </td>
                       </tr>
                     ))}
-                  </tbody>
-                </table>
+                    </tbody>
+                    <tfoot className="bg-gray-50 border-t border-gray-200">
+                      <tr>
+                        <td className="px-3 py-2 text-xs font-semibold text-gray-600" colSpan={2}>
+                          Total / المجموع
+                        </td>
+                        <td className="px-3 py-2 text-xs font-semibold text-gray-600">{ops.length}</td>
+                        <td className="px-3 py-2 text-xs font-semibold text-gray-600">
+                          {ops.reduce((s, o) => s + o.quantity, 0)}
+                        </td>
+                        <td className="px-3 py-2 text-xs font-semibold text-gray-600" colSpan={3}>
+                          {opsByStatus('QUEUED', ops)}Q · {opsByStatus('IN_PROGRESS', ops)}IP · {opsByStatus('COMPLETED', ops)}C
+                        </td>
+                      </tr>
+                    </tfoot>
+                  </table>
               </div>
             </div>
           ))}
@@ -233,6 +250,10 @@ function groupBy<T extends Record<string, unknown>>(arr: T[], key: string): Reco
     map[k].push(item);
   }
   return map;
+}
+
+function opsByStatus(status: string, ops: OperationRow[]): number {
+  return ops.filter((o) => o.status === status).length;
 }
 
 function formatTime(iso: string): string {

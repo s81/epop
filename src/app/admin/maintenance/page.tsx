@@ -1,8 +1,8 @@
-import { desc, eq, sql } from 'drizzle-orm';
+import { asc, desc, eq, sql } from 'drizzle-orm';
 import { db } from '@/db/db';
 import { maintenanceRequest, workCenter } from '@/db/schema';
 import { MaintenanceClient } from './client';
-import { resolveMaintenanceAction } from './actions';
+import { resolveMaintenanceAction, createMaintenanceRequest } from './actions';
 
 const PAGE_SIZE = 50;
 
@@ -40,9 +40,16 @@ export default async function MaintenancePage({
   const totalCount = Number(countResult[0]?.count ?? 0);
   const totalPages = Math.ceil(totalCount / PAGE_SIZE);
 
+  const workCenters = await db
+    .select({ id: workCenter.id, code: workCenter.code, nameAr: workCenter.nameAr })
+    .from(workCenter)
+    .orderBy(asc(workCenter.code));
+
   return (
     <MaintenanceClient
       data={requests}
+      workCenters={workCenters}
+      onCreate={createMaintenanceRequest}
       onResolve={resolveMaintenanceAction}
       currentPage={page}
       totalPages={totalPages}

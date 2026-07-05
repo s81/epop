@@ -9,6 +9,7 @@ import {
   workOrder,
   workOrderOperation,
 } from '@/db/schema';
+import { getLaborHours } from '@/db/labor';
 import Link from 'next/link';
 
 const STATUS_COLORS: Record<string, string> = {
@@ -28,7 +29,7 @@ function todayStr(): string {
 export default async function DashboardPage() {
   const today = todayStr();
 
-  const [ordersByStatus, opsByStatus, wcLoad, recentEvents, openMaint, defectCount, todayActual, todayTarget] = await Promise.all([
+  const [ordersByStatus, opsByStatus, wcLoad, recentEvents, openMaint, defectCount, todayActual, todayTarget, todayEventCount, todayOperators, recentOrders] = await Promise.all([
     db.select({ status: workOrder.status, count: count() }).from(workOrder).groupBy(workOrder.status),
     db.select({ status: workOrderOperation.status, count: count() }).from(workOrderOperation).groupBy(workOrderOperation.status),
     db.select({
@@ -57,7 +58,19 @@ export default async function DashboardPage() {
       .from(productionTarget)
       .where(eq(productionTarget.date, today))
       .then(r => r[0]?.total ?? null),
+    db.select({ count: count() }).from(operationEvent)
+      .where(like(operationEvent.occurredAt, `${today}T%`))
+      .then(r => r[0]?.count ?? 0),
+    getLaborHours(today, today),
+    db.select({
+      id: workOrder.id,
+      orderNumber: workOrder.orderNumber,
+      status: workOrder.status,
+      createdAt: workOrder.createdAt,
+    }).from(workOrder).orderBy(desc(workOrder.createdAt)).limit(5),
   ]);
+
+  const orderStatusTotal = ordersByStatus.reduce((s, r) => s + r.count, 0);
 
   const totalOps = opsByStatus.reduce((s, r) => s + r.count, 0);
   const inProgressCount = opsByStatus.find((r) => r.status === 'IN_PROGRESS')?.count ?? 0;
@@ -69,7 +82,7 @@ export default async function DashboardPage() {
       <h1 className="text-xl font-semibold text-gray-900 mb-6">Dashboard / لوحة القيادة</h1>
 
       {/* KPI cards */}
-      <div className="grid grid-cols-5 gap-4 mb-8">
+      <div className="grid grid-cols-6 gap-4 mb-8">
         {[
           { label: 'Work Orders', value: ordersByStatus.reduce((s, r) => s + r.count, 0), color: 'bg-indigo-50 text-indigo-700 border-indigo-200', href: '/orders' },
           { label: 'In Progress', value: inProgressCount, color: 'bg-green-50 text-green-700 border-green-200', href: '/tablet' },
@@ -87,6 +100,12 @@ export default async function DashboardPage() {
               : 'bg-gray-50 text-gray-500 border-gray-200',
             href: '/admin/targets',
           },
+          {
+            label: "Today's Events / أحداث اليوم",
+            value: todayEventCount,
+            color: 'bg-cyan-50 text-cyan-700 border-cyan-200',
+            href: '/admin/audit',
+          },
         ].map(({ label, value, color, href }) => (
           <Link key={label} href={href} className={`rounded-lg border p-4 ${color} hover:shadow-sm transition-shadow`}>
             <div className="text-2xl font-bold">{value}</div>
@@ -96,6 +115,35 @@ export default async function DashboardPage() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+        {/* Orders by Status */}
+        <div className="bg-white rounded-lg border border-gray-200 p-4">
+          <h2 className="text-sm font-semibold text-gray-700 mb-3">Orders by Status / الطلبات حسب الحالة</h2>
+          <div className="space-y-2">
+            {ordersByStatus.map((r) => {
+              const pct = orderStatusTotal ? (r.count / orderStatusTotal) * 100 : 0;
+              return (
+                <div key={r.status}>
+                  <div className="flex justify-between text-xs text-gray-500 mb-0.5">
+                    <span>{r.status}</span>
+                    <span>{r.count}</span>
+                  </div>
+                  <div className="w-full bg-gray-100 rounded-full h-2.5">
+                    <div
+                      className={`h-2.5 rounded-full transition-all ${
+                        r.status === 'DRAFT' ? 'bg-gray-400' :
+                        r.status === 'RELEASED' ? 'bg-blue-400' :
+                        r.status === 'IN_PROGRESS' ? 'bg-green-400' :
+                        'bg-indigo-400'
+                      }`}
+                      style={{ width: `${pct}%` }}
+                    />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
         {/* Operations by Status */}
         <div className="bg-white rounded-lg border border-gray-200 p-4">
           <h2 className="text-sm font-semibold text-gray-700 mb-3">Operations by Status / العمليات حسب الحالة</h2>
@@ -152,6 +200,57 @@ export default async function DashboardPage() {
               );
             })}
           </div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+        {/* Top Operators Today */}
+        <div className="bg-white rounded-lg border border-gray-200 p-4">
+          <h2 className="text-sm font-semibold text-gray-700 mb-3">Top Operators Today / أفضل المشغلين اليوم</h2>
+          {todayOperators.length === 0 ? (
+            <p className="text-xs text-gray-400">No data yet</p>
+          ) : (
+            <div className="space-y-2">
+              {todayOperators.slice(0, 5).map((r) => {
+                const h = Math.floor(r.minutes / 60);
+                const m = Math.round(r.minutes % 60);
+                return (
+                  <div key={r.operatorId + r.date} className="flex items-center justify-between text-xs">
+                    <span className="font-mono text-gray-800">{r.operatorId}</span>
+                    <span className="text-gray-500">{h > 0 ? `${h}h ${m}m` : `${m}m`}</span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* Recent Orders */}
+        <div className="bg-white rounded-lg border border-gray-200 p-4">
+          <h2 className="text-sm font-semibold text-gray-700 mb-3">Recent Orders / آخر الطلبات</h2>
+          {recentOrders.length === 0 ? (
+            <p className="text-xs text-gray-400">No orders yet</p>
+          ) : (
+            <div className="space-y-2">
+              {recentOrders.map((o) => (
+                <Link
+                  key={o.id}
+                  href={`/admin/orders/${o.id}`}
+                  className="flex items-center justify-between text-xs hover:bg-gray-50 p-1.5 rounded transition-colors"
+                >
+                  <span className="font-mono text-gray-800">{o.orderNumber}</span>
+                  <span className={`inline-flex px-1.5 py-0.5 rounded text-[10px] font-medium ${
+                    o.status === 'DRAFT' ? 'bg-gray-100 text-gray-600' :
+                    o.status === 'RELEASED' ? 'bg-blue-100 text-blue-700' :
+                    o.status === 'IN_PROGRESS' ? 'bg-yellow-100 text-yellow-700' :
+                    'bg-green-100 text-green-700'
+                  }`}>
+                    {o.status}
+                  </span>
+                </Link>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 

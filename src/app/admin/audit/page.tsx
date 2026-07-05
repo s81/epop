@@ -141,11 +141,18 @@ export default async function AuditPage({
                 </tr>
               ))}
             </tbody>
+            <tfoot>
+              <tr className="border-t border-gray-700 text-gray-400">
+                <td className="py-3 pr-4 text-xs font-semibold" colSpan={7}>
+                  Total / المجموع: {events.length} events on this page
+                </td>
+              </tr>
+            </tfoot>
           </table>
 
           <div className="flex items-center justify-between mt-6 text-sm text-gray-400">
             <div>
-              Page {page} of {Math.max(1, totalPages)} / صفحة {page} من {Math.max(1, totalPages)}
+              {totalCount} total events · Page {page} of {Math.max(1, totalPages)} / إجمالي {totalCount} حدث · صفحة {page} من {Math.max(1, totalPages)}
             </div>
             <div className="flex gap-4">
               {page > 1 ? (
