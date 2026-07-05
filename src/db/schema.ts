@@ -253,6 +253,54 @@ export const productionTarget = sqliteTable('production_target', {
     .default(sql`(strftime('%Y-%m-%dT%H:%M:%fZ','now'))`),
 });
 
+// --- Inventory / Materials ---
+
+export const MATERIAL_CATEGORIES = ['WOOD', 'METAL', 'FABRIC', 'HARDWARE', 'PACKAGING', 'OTHER'] as const;
+export type MaterialCategoryType = (typeof MATERIAL_CATEGORIES)[number];
+
+export const STOCK_TX_TYPES = ['RECEIPT', 'ISSUE', 'ADJUSTMENT'] as const;
+export type StockTxType = (typeof STOCK_TX_TYPES)[number];
+
+export const materialCategory = sqliteTable('material_category', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  code: text('code').notNull().unique(),
+  nameAr: text('name_ar').notNull(),
+  nameEn: text('name_en').notNull(),
+  createdAt: text('created_at')
+    .notNull()
+    .default(sql`(strftime('%Y-%m-%dT%H:%M:%fZ','now'))`),
+});
+
+export const material = sqliteTable('material', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  code: text('code').notNull().unique(),
+  nameAr: text('name_ar').notNull(),
+  nameEn: text('name_en').notNull(),
+  unit: text('unit').notNull().default('pcs'),
+  categoryId: integer('category_id')
+    .notNull()
+    .references(() => materialCategory.id),
+  createdAt: text('created_at')
+    .notNull()
+    .default(sql`(strftime('%Y-%m-%dT%H:%M:%fZ','now'))`),
+});
+
+export const stockTransaction = sqliteTable('stock_transaction', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  materialId: integer('material_id')
+    .notNull()
+    .references(() => material.id),
+  type: text('type', { enum: STOCK_TX_TYPES }).notNull(),
+  quantity: real('quantity').notNull(),
+  reference: text('reference'),
+  workOrderId: integer('work_order_id').references(() => workOrder.id),
+  note: text('note'),
+  createdBy: text('created_by'),
+  createdAt: text('created_at')
+    .notNull()
+    .default(sql`(strftime('%Y-%m-%dT%H:%M:%fZ','now'))`),
+});
+
 // --- Auth ---
 
 export const USER_ROLES = ['VIEWER', 'DATA_ENTRY', 'ADMIN'] as const;
