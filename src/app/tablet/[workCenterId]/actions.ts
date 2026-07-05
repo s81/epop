@@ -15,7 +15,7 @@ import type { MaintenanceCategory, OperationEventType, QualityDefectCategory } f
 export async function applyEventAction(
   _prev: unknown,
   formData: FormData,
-): Promise<{ error: string } | null> {
+): Promise<{ error: string } | { success: true; eventType: string }> {
   const operationId = Number(formData.get('operationId'));
   if (!Number.isInteger(operationId) || operationId <= 0) return { error: 'Invalid operationId' };
   const eventType = formData.get('eventType') as OperationEventType;
@@ -26,7 +26,7 @@ export async function applyEventAction(
   try {
     await applyEvent(operationId, eventType, { operatorId });
     revalidatePath(`/tablet/${workCenterId}`);
-    return null;
+    return { success: true, eventType };
   } catch (e) {
     return { error: e instanceof Error ? e.message : String(e) };
   }
@@ -80,6 +80,7 @@ export async function rejectWithDefectAction(
   const operatorIdRaw = String(formData.get('operatorId') ?? '').trim();
   const operatorId = operatorIdRaw || undefined;
   const reportedBy = operatorId ?? 'unknown';
+  const note = String(formData.get('note') ?? '').trim() || undefined;
 
   const [op] = await db
     .select({ wcId: workOrderOperation.workCenterId })
@@ -88,7 +89,7 @@ export async function rejectWithDefectAction(
   if (!op || op.wcId !== Number(workCenterId)) return { error: 'Operation does not belong to this work center' };
 
   try {
-    const { eventId } = await applyEvent(operationId, 'REJECT', { operatorId });
+    const { eventId } = await applyEvent(operationId, 'REJECT', { operatorId, note });
     try {
       await db.insert(qualityDefect).values({
         operationId,

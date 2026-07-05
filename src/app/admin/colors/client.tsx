@@ -5,14 +5,14 @@ import type { color, colorFamily } from '@/db/schema';
 import type { InferSelectModel } from 'drizzle-orm';
 import type { deleteColor } from './actions';
 
-type Color = InferSelectModel<typeof color>;
+type Color = InferSelectModel<typeof color> & { colorFamilyName: string };
 type ColorFamily = Pick<InferSelectModel<typeof colorFamily>, 'id' | 'nameEn' | 'code'>;
 
 const COLUMNS = [
   { key: 'code' as const,   header: 'Code' },
   { key: 'nameAr' as const, header: 'Arabic Name', rtl: true },
   { key: 'nameEn' as const, header: 'English Name' },
-  { key: 'colorFamilyId' as const, header: 'Family ID' },
+  { key: 'colorFamilyName' as const, header: 'Family' },
 ];
 
 export function ColorsClient({

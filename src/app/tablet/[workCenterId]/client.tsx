@@ -19,6 +19,7 @@ type QueueItem = {
   modelCode: string;
   orderNumber: string;
   quantity: number;
+  startedAt: string | null;
 };
 
 type EventItem = {
@@ -57,15 +58,27 @@ const EVENT_BADGE: Record<OperationEventType, string> = {
   FINISH: 'bg-blue-900 text-blue-300',
   ACCEPT: 'bg-emerald-900 text-emerald-300',
   REJECT: 'bg-red-900 text-red-300',
+  RESTART:'bg-purple-900 text-purple-300',
 };
 
 const EVENT_LABEL: Record<OperationEventType, string> = {
-  START:  'بدء',
-  PAUSE:  'إيقاف',
-  RESUME: 'استئناف',
-  FINISH: 'إنهاء',
-  ACCEPT: 'قبول',
-  REJECT: 'رفض',
+  START:  'بدء / Start',
+  PAUSE:  'إيقاف / Pause',
+  RESUME: 'استئناف / Resume',
+  FINISH: 'إنهاء / Finish',
+  ACCEPT: 'قبول / Accept',
+  REJECT: 'رفض / Reject',
+  RESTART:'إعادة / Rework',
+};
+
+const SUCCESS_MESSAGE: Record<OperationEventType, string> = {
+  START:  'تم البدء / Started',
+  PAUSE:  'تم الإيقاف / Paused',
+  RESUME: 'تم الاستئناف / Resumed',
+  FINISH: 'تم الإنهاء / Finished',
+  ACCEPT: 'تم القبول / Accepted',
+  REJECT: 'تم الرفض / Rejected',
+  RESTART:'تمت الإعادة / Reworked',
 };
 
 const MAINTENANCE_CATEGORIES = [
@@ -82,6 +95,54 @@ const DEFECT_CATEGORIES = [
   { value: 'OTHER',       labelAr: 'أخرى',    labelEn: 'Other' },
 ];
 
+// ---- Sound effects ----
+
+let _audioCtx: AudioContext | null = null;
+
+function getAudioCtx(): AudioContext | null {
+  if (!_audioCtx) {
+    const Ctor = window.AudioContext || (window as any).webkitAudioContext;
+    if (!Ctor) return null;
+    _audioCtx = new Ctor();
+  }
+  if (_audioCtx.state === 'suspended') _audioCtx.resume();
+  return _audioCtx;
+}
+
+function playSuccessSound() {
+  try {
+    const ctx = getAudioCtx();
+    if (!ctx) return;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(523, ctx.currentTime);
+    osc.frequency.linearRampToValueAtTime(659, ctx.currentTime + 0.2);
+    gain.gain.setValueAtTime(0.3, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.2);
+    osc.connect(gain).connect(ctx.destination);
+    osc.start();
+    osc.stop(ctx.currentTime + 0.2);
+  } catch {}
+}
+
+function playErrorSound() {
+  try {
+    const ctx = getAudioCtx();
+    if (!ctx) return;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(400, ctx.currentTime);
+    osc.frequency.linearRampToValueAtTime(200, ctx.currentTime + 0.3);
+    gain.gain.setValueAtTime(0.3, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.3);
+    osc.connect(gain).connect(ctx.destination);
+    osc.start();
+    osc.stop(ctx.currentTime + 0.3);
+  } catch {}
+}
+
 // ---- ActionForm helper ----
 
 function ActionForm({
@@ -93,6 +154,7 @@ function ActionForm({
   operatorId,
   dispatch,
   onSubmit,
+  disabled,
 }: {
   op: QueueItem;
   eventType: OperationEventType;
@@ -102,6 +164,7 @@ function ActionForm({
   operatorId: string;
   dispatch: (payload: FormData) => void;
   onSubmit: (e: React.FormEvent<HTMLFormElement>) => void;
+  disabled?: boolean;
 }) {
   return (
     <form action={dispatch} onSubmit={onSubmit} className="flex-1">
@@ -111,9 +174,10 @@ function ActionForm({
       <input type="hidden" name="operatorId" value={operatorId} />
       <button
         type="submit"
-        className={`w-full min-h-[72px] text-xl font-bold rounded-xl text-white transition-colors ${colorClass}`}
+        disabled={disabled}
+        className={`w-full min-h-[72px] text-xl font-bold rounded-xl text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 ${colorClass}`}
       >
-        {label}
+        {label}{disabled ? ' ...' : ''}
       </button>
     </form>
   );
@@ -141,28 +205,64 @@ export function TabletClient({
   const router = useRouter();
   const [operatorId, setOperatorId] = useState('');
   const [operatorError, setOperatorError] = useState(false);
-  const [actionState, dispatchAction] = useActionState(onAction, null);
+  const [actionState, dispatchAction, isFormPending] = useActionState(onAction, null);
   const [displayError, setDisplayError] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [modal, setModal] = useState<Modal>(null);
-  const [isPending, startTransition] = useTransition();
+  const [elapsed, setElapsed] = useState('');
+  const [isTransitionPending, startTransition] = useTransition();
 
   useEffect(() => {
     const id = setInterval(() => {
-      setDisplayError(null);
       router.refresh();
     }, 8000);
     return () => clearInterval(id);
   }, [router]);
 
   useEffect(() => {
-    if (actionState?.error) {
-      setDisplayError(actionState.error);
-      router.refresh();
-    }
-  }, [actionState, router]);
+    if (!displayError) return;
+    const id = setTimeout(() => setDisplayError(null), 4000);
+    return () => clearTimeout(id);
+  }, [displayError]);
+
+  useEffect(() => {
+    if (!successMessage) return;
+    const id = setTimeout(() => setSuccessMessage(null), 2000);
+    return () => clearTimeout(id);
+  }, [successMessage]);
 
   const active = queue[0] ?? null;
   const upcoming = queue.slice(1);
+
+  useEffect(() => {
+    if (!actionState) return;
+    if ('error' in actionState) {
+      setDisplayError(actionState.error);
+      router.refresh();
+      playErrorSound();
+    } else if ('eventType' in actionState) {
+      setSuccessMessage(SUCCESS_MESSAGE[actionState.eventType as OperationEventType]);
+      playSuccessSound();
+    }
+  }, [actionState, router]);
+
+  useEffect(() => {
+    if (active?.status !== 'IN_PROGRESS' || !active?.startedAt) {
+      setElapsed('');
+      return;
+    }
+    function tick() {
+      const start = new Date(active.startedAt!).getTime();
+      const diff = Date.now() - start;
+      const h = String(Math.floor(diff / 3600000)).padStart(2, '0');
+      const m = String(Math.floor((diff % 3600000) / 60000)).padStart(2, '0');
+      const s = String(Math.floor((diff % 60000) / 1000)).padStart(2, '0');
+      setElapsed(`⏱ ${h}:${m}:${s}`);
+    }
+    tick();
+    const id = setInterval(tick, 1000);
+    return () => clearInterval(id);
+  }, [active?.status, active?.startedAt]);
 
   function handleActionSubmit(e: React.FormEvent<HTMLFormElement>) {
     if (!operatorId.trim()) {
@@ -206,12 +306,13 @@ export function TabletClient({
     });
   }
 
-  function handleRejectConfirm(defectCategory: string) {
+  function handleRejectConfirm(defectCategory: string, note?: string) {
     if (!active) return;
     startTransition(async () => {
       const fd = new FormData();
       fd.append('operationId', String(active.id));
       fd.append('defectCategory', defectCategory);
+      fd.append('note', note ?? '');
       fd.append('workCenterId', String(workCenter.id));
       fd.append('operatorId', operatorId);
       try {
@@ -242,6 +343,7 @@ export function TabletClient({
         <ConfirmModal
           title="سبب الرفض / Defect Type"
           categories={DEFECT_CATEGORIES}
+          noteField
           onConfirm={handleRejectConfirm}
           onCancel={() => setModal(null)}
         />
@@ -284,6 +386,9 @@ export function TabletClient({
                 <p className="text-sm text-gray-400 mt-1">
                   {active.orderNumber} · تسلسل {active.sequence}
                 </p>
+                <p className="text-xs text-gray-500 mt-0.5 font-mono">
+                  {active.modelCode} × {active.quantity}
+                </p>
               </div>
               <span
                 className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium flex-shrink-0 ${STATUS_BADGE[active.status]}`}
@@ -291,6 +396,10 @@ export function TabletClient({
                 {STATUS_LABEL[active.status]}
               </span>
             </div>
+
+            {active.status === 'IN_PROGRESS' && (
+              <p className="text-center text-2xl font-mono text-green-400 mb-4">{elapsed}</p>
+            )}
 
             {/* FSM buttons */}
             <div className="flex gap-3">
@@ -304,6 +413,7 @@ export function TabletClient({
                   operatorId={operatorId}
                   dispatch={dispatchAction}
                   onSubmit={handleActionSubmit}
+                  disabled={isFormPending}
                 />
               )}
               {active.status === 'IN_PROGRESS' && (
@@ -317,6 +427,7 @@ export function TabletClient({
                     operatorId={operatorId}
                     dispatch={dispatchAction}
                     onSubmit={handleActionSubmit}
+                    disabled={isFormPending}
                   />
                   <ActionForm
                     op={active}
@@ -327,6 +438,7 @@ export function TabletClient({
                     operatorId={operatorId}
                     dispatch={dispatchAction}
                     onSubmit={handleActionSubmit}
+                    disabled={isFormPending}
                   />
                 </>
               )}
@@ -340,6 +452,7 @@ export function TabletClient({
                   operatorId={operatorId}
                   dispatch={dispatchAction}
                   onSubmit={handleActionSubmit}
+                  disabled={isFormPending}
                 />
               )}
               {active.status === 'PENDING_QC' && (
@@ -353,23 +466,46 @@ export function TabletClient({
                     operatorId={operatorId}
                     dispatch={dispatchAction}
                     onSubmit={handleActionSubmit}
+                    disabled={isFormPending}
                   />
                   <button
                     type="button"
                     onClick={handleRejectClick}
-                    disabled={isPending}
+                    disabled={isTransitionPending}
                     className="flex-1 min-h-[72px] text-xl font-bold rounded-xl text-white bg-red-600 hover:bg-red-500 disabled:opacity-50 transition-colors"
                   >
                     رفض / Reject
                   </button>
                 </>
               )}
+              {active.status === 'REJECTED' && (
+                <ActionForm
+                  op={active}
+                  eventType="RESTART"
+                  label="إعادة العمل / Rework"
+                  colorClass="bg-purple-600 hover:bg-purple-500"
+                  workCenterId={workCenter.id}
+                  operatorId={operatorId}
+                  dispatch={dispatchAction}
+                  onSubmit={handleActionSubmit}
+                  disabled={isFormPending}
+                />
+              )}
             </div>
 
+            {successMessage && (
+              <div className="bg-green-700 border border-green-600 rounded-xl p-4 mt-3">
+                <p className="text-green-100 text-base font-medium">
+                  ✓ {successMessage}
+                </p>
+              </div>
+            )}
             {displayError && (
-              <p className="text-red-400 text-sm mt-3">
-                ⚠ {displayError}
-              </p>
+              <div className="bg-red-900/50 border border-red-700 rounded-xl p-4 mt-3">
+                <p className="text-red-200 text-base font-medium">
+                  ⚠ {displayError}
+                </p>
+              </div>
             )}
           </div>
         ) : (
@@ -441,7 +577,11 @@ export function TabletClient({
       {/* Footer nav */}
       <footer className="px-6 py-3 bg-gray-900 border-t border-gray-800 flex-shrink-0">
         {displayError && !active && (
-          <p className="text-red-400 text-sm mb-2">⚠ {displayError}</p>
+          <div className="bg-red-900/50 border border-red-700 rounded-xl p-4 mb-3">
+            <p className="text-red-200 text-base font-medium">
+              ⚠ {displayError}
+            </p>
+          </div>
         )}
         <div className="flex items-center justify-between">
           <Link href="/tablet" className="text-xs text-gray-600 hover:text-gray-400 transition-colors">
@@ -450,7 +590,7 @@ export function TabletClient({
           <button
             type="button"
             onClick={handleMaintenanceClick}
-            disabled={isPending}
+            disabled={isTransitionPending}
             className="text-xs text-amber-500 hover:text-amber-400 disabled:opacity-50 transition-colors font-medium"
           >
             ⚠ إبلاغ عن عطل / Report Maintenance

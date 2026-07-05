@@ -1,0 +1,8 @@
+.git
+node_modules
+.next
+*.db
+*.db-wal
+*.db-shm
+graphify-out
+coverage

@@ -16,10 +16,10 @@ export default async function TabletIndexPage() {
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center p-8">
-      <h1 className="text-2xl font-bold mb-2">e-pop</h1>
+      <h1 className="text-2xl font-bold mb-2">e-pop · محطات العمل</h1>
       <p className="text-gray-400 mb-8 text-lg">اختر محطة العمل / Select Work Center</p>
       {centers.length === 0 ? (
-        <p className="text-gray-500">No work centers configured — add them in Master Data.</p>
+        <p className="text-gray-500">لم يتم إضافة محطات عمل / No work centers configured</p>
       ) : (
         <div className="grid grid-cols-2 md:grid-cols-3 gap-4 w-full max-w-2xl">
           {centers.map((wc) => (
@@ -36,7 +36,7 @@ export default async function TabletIndexPage() {
         </div>
       )}
       <div className="mt-8">
-        <Link href="/orders" className="text-xs text-gray-600 hover:text-gray-400 transition-colors">
+        <Link href="/admin/orders" className="text-xs text-gray-600 hover:text-gray-400 transition-colors">
           ← Work Orders
         </Link>
       </div>
