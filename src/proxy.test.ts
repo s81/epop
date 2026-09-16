@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 import { NextRequest } from 'next/server';
 import { SignJWT } from 'jose';
-import { middleware } from './middleware';
+import { proxy } from './proxy';
 
 const SECRET = 'test-secret-exactly-thirty-two-bytes!';
 beforeAll(() => { process.env.SESSION_SECRET = SECRET; });
@@ -21,67 +21,67 @@ function req(path: string, token?: string): NextRequest {
   return new NextRequest(`http://localhost${path}`, { headers });
 }
 
-describe('middleware', () => {
+describe('proxy', () => {
   it('passes /login through without a cookie', async () => {
-    const res = await middleware(req('/login'));
+    const res = await proxy(req('/login'));
     expect(res.status).not.toBe(307);
   });
 
   it('passes /tablet/1 through without a cookie', async () => {
-    const res = await middleware(req('/tablet/1'));
+    const res = await proxy(req('/tablet/1'));
     expect(res.status).not.toBe(307);
   });
 
   it('redirects /admin/departments to /login when no cookie', async () => {
-    const res = await middleware(req('/admin/departments'));
+    const res = await proxy(req('/admin/departments'));
     expect(res.status).toBe(307);
     expect(res.headers.get('location')).toContain('/login');
   });
 
   it('redirects /orders to /login when no cookie', async () => {
-    const res = await middleware(req('/orders'));
+    const res = await proxy(req('/orders'));
     expect(res.status).toBe(307);
     expect(res.headers.get('location')).toContain('/login');
   });
 
   it('passes /admin/departments with valid DATA_ENTRY token', async () => {
     const token = await makeToken('DATA_ENTRY');
-    const res = await middleware(req('/admin/departments', token));
+    const res = await proxy(req('/admin/departments', token));
     expect(res.status).not.toBe(307);
   });
 
   it('redirects /admin/users to /admin when role is DATA_ENTRY', async () => {
     const token = await makeToken('DATA_ENTRY');
-    const res = await middleware(req('/admin/users', token));
+    const res = await proxy(req('/admin/users', token));
     expect(res.status).toBe(307);
     expect(res.headers.get('location')).toContain('/admin');
   });
 
   it('passes /admin/users with ADMIN token', async () => {
     const token = await makeToken('ADMIN');
-    const res = await middleware(req('/admin/users', token));
+    const res = await proxy(req('/admin/users', token));
     expect(res.status).not.toBe(307);
   });
 
   it('redirects /admin/foo to /login when no cookie', async () => {
-    const res = await middleware(req('/admin/foo'));
+    const res = await proxy(req('/admin/foo'));
     expect(res.status).toBe(307);
     expect(res.headers.get('location')).toContain('/login');
   });
 
   it('passes / (home) with valid VIEWER token', async () => {
     const token = await makeToken('VIEWER');
-    const res = await middleware(req('/', token));
+    const res = await proxy(req('/', token));
     expect(res.status).not.toBe(307);
   });
 
   it('passes /api/operations without auth check', async () => {
-    const res = await middleware(req('/api/operations'));
+    const res = await proxy(req('/api/operations'));
     expect(res.status).not.toBe(307);
   });
 
   it('passes /_next/static/chunks/main.js without auth check', async () => {
-    const res = await middleware(req('/_next/static/chunks/main.js'));
+    const res = await proxy(req('/_next/static/chunks/main.js'));
     expect(res.status).not.toBe(307);
   });
 });

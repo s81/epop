@@ -48,7 +48,7 @@ Status: Phase 0 schema ✅ · Phase 1 backend engine ✅ · Phase 1a master data
 - All `/admin/*` server actions have **no auth gate**. They are independently
   callable HTTP endpoints — anyone who can reach the server can mutate master data.
 - Before deploying to a networked environment, add:
-  1. `middleware.ts` guarding `/admin/*` (redirect unauthenticated to `/login`)
+  1. `src/proxy.ts` (Next 16 proxy, formerly middleware) guarding `/admin/*` (redirect unauthenticated to `/login`)
   2. A `requireAdmin()` helper called at the top of every `actions.ts` function
   3. An auth system (NextAuth / Clerk / custom) with a user/session model
 - Deferred deliberately — no auth design exists yet. Do this before Phase 4 (tablet UI).

@@ -1,4 +1,4 @@
-import { defineConfig } from 'vitest/config';
+import { defineConfig, configDefaults } from 'vitest/config';
 import { resolve } from 'path';
 
 export default defineConfig({
@@ -7,5 +7,7 @@ export default defineConfig({
   },
   test: {
     environment: 'node',
+    // Never scan git worktrees checked out under .claude/ — they carry their own copies of every test.
+    exclude: [...configDefaults.exclude, '.claude/**'],
   },
 });
