@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { db } from '@/db/db';
 import { material } from '@/db/schema';
 import { requireRole } from '@/lib/auth';
+import { dbErrorMessage } from '@/lib/db-errors';
 
 export async function saveMaterial(_prev: unknown, formData: FormData) {
   const id = formData.get('id');
@@ -26,14 +27,22 @@ export async function saveMaterial(_prev: unknown, formData: FormData) {
     revalidatePath('/admin/materials');
     return { success: true };
   } catch (e: unknown) {
-    const msg = e instanceof Error ? e.message : String(e);
+    const msg = dbErrorMessage(e);
     return { error: msg.includes('UNIQUE') ? `Code "${code}" already exists` : msg };
   }
 }
 
-export async function deleteMaterial(formData: FormData) {
+export async function deleteMaterial(formData: FormData): Promise<void | { error: string }> {
   await requireRole('DATA_ENTRY');
   const id = Number(formData.get('id'));
-  await db.delete(material).where(eq(material.id, id));
+  try {
+    await db.delete(material).where(eq(material.id, id));
+  } catch (e: unknown) {
+    const msg = dbErrorMessage(e);
+    if (msg.includes('FOREIGN KEY')) {
+      return { error: 'Cannot delete: this material has stock transactions / لا يمكن الحذف: لهذه المادة حركات مخزون' };
+    }
+    return { error: msg };
+  }
   revalidatePath('/admin/materials');
 }

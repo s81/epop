@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { db } from '@/db/db';
 import { department } from '@/db/schema';
 import { requireRole } from '@/lib/auth';
+import { dbErrorMessage } from '@/lib/db-errors';
 
 export async function saveDepartment(_prev: unknown, formData: FormData) {
   const id = formData.get('id');
@@ -21,7 +22,7 @@ export async function saveDepartment(_prev: unknown, formData: FormData) {
     revalidatePath('/admin/departments');
     return { success: true };
   } catch (e: unknown) {
-    const msg = e instanceof Error ? e.message : String(e);
+    const msg = dbErrorMessage(e);
     return { error: msg.includes('UNIQUE') ? `Code "${code}" already exists` : msg };
   }
 }

@@ -5,6 +5,7 @@ import bcrypt from 'bcryptjs';
 import { db } from '@/db/db';
 import { user, USER_ROLES } from '@/db/schema';
 import { requireRole } from '@/lib/auth';
+import { dbErrorMessage } from '@/lib/db-errors';
 import type { UserRole } from '@/db/schema';
 
 export async function saveUser(
@@ -37,12 +38,8 @@ export async function saveUser(
     revalidatePath('/admin/users');
     return { success: true };
   } catch (e: unknown) {
-    const isUnique =
-      e instanceof Error &&
-      (e.message.includes('UNIQUE') ||
-        (e.cause instanceof Error && e.cause.message.includes('UNIQUE')));
-    const msg = e instanceof Error ? e.message : String(e);
-    return { error: isUnique ? `Username "${username}" already exists` : msg };
+    const msg = dbErrorMessage(e);
+    return { error: msg.includes('UNIQUE') ? `Username "${username}" already exists` : msg };
   }
 }
 

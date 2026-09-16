@@ -38,6 +38,7 @@ function TxForm({
   materials,
   workOrders,
   showWorkOrder,
+  allowNegative,
   onSuccess,
   onCancel,
 }: {
@@ -46,6 +47,7 @@ function TxForm({
   materials: MaterialRow[];
   workOrders?: { id: number; orderNumber: string }[];
   showWorkOrder?: boolean;
+  allowNegative?: boolean;
   onSuccess: () => void;
   onCancel: () => void;
 }) {
@@ -72,12 +74,14 @@ function TxForm({
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">Quantity / الكمية</label>
+        <label className="block text-sm font-medium text-gray-700 mb-1">
+          Quantity / الكمية{allowNegative ? ' (+/-)' : ''}
+        </label>
         <input
           name="quantity"
           type="number"
           step="0.01"
-          min="0"
+          min={allowNegative ? undefined : '0'}
           required
           className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
         />
@@ -300,7 +304,7 @@ export function InventoryClient({
           <TxForm title="Issue" action={onIssue} materials={materials} workOrders={workOrders} showWorkOrder onSuccess={close} onCancel={close} />
         )}
         {dialog.type === 'ADJUSTMENT' && (
-          <TxForm title="Adjustment" action={onAdjustment} materials={materials} onSuccess={close} onCancel={close} />
+          <TxForm title="Adjustment" action={onAdjustment} materials={materials} allowNegative onSuccess={close} onCancel={close} />
         )}
       </Dialog>
     </div>

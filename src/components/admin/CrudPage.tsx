@@ -17,7 +17,7 @@ export type CrudPageProps<T extends { id: number }> = {
     onSuccess: () => void;
     [key: string]: unknown;
   }>;
-  onDelete: (formData: FormData) => Promise<void>;
+  onDelete: (formData: FormData) => Promise<void | { error: string }>;
   formProps?: Record<string, unknown>;
 };
 
@@ -30,6 +30,7 @@ export function CrudPage<T extends { id: number }>({
   formProps = {},
 }: CrudPageProps<T>) {
   const [dialog, setDialog] = useState<{ open: boolean; item?: T }>({ open: false });
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const close = () => setDialog({ open: false });
   const singular = title.replace(/ies$/, 'y').replace(/s$/, '');
@@ -45,6 +46,10 @@ export function CrudPage<T extends { id: number }>({
           + New {singular}
         </button>
       </div>
+
+      {deleteError && (
+        <p role="alert" className="mb-4 text-sm text-red-600">{deleteError}</p>
+      )}
 
       <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
         <table className="w-full text-sm">
@@ -91,7 +96,10 @@ export function CrudPage<T extends { id: number }>({
                     >
                       Edit
                     </button>
-                    <form action={onDelete} className="inline">
+                    <form
+                      action={async (fd) => setDeleteError((await onDelete(fd))?.error ?? null)}
+                      className="inline"
+                    >
                       <input type="hidden" name="id" value={item.id} />
                       <button
                         type="submit"

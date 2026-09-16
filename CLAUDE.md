@@ -54,6 +54,15 @@ Status: Phase 0 schema ✅ · Phase 1 backend engine ✅ · Phase 1a master data
 - Deferred deliberately — no auth design exists yet. Do this before Phase 4 (tablet UI).
 
 ## Conventions / gotchas
+- **Migrations run through `scripts/migrate.ts`, not `drizzle-kit migrate`.**
+  It hand-rolls a runner that reads every `.sql` file in `src/db/migrations/`
+  in order and applies each statement, tolerating "already exists"/"UNIQUE"
+  errors as already-applied. This is what `docker-entrypoint.sh` calls in
+  the deployed image, and `npm run db:migrate` now wraps it too. drizzle-kit's
+  own tracking table (`__drizzle_migrations`) is never populated — don't try
+  to make `drizzle-kit migrate` work directly against a real DB, it will
+  attempt to replay migrations from scratch. `drizzle-kit generate` (schema →
+  new `.sql` file) is unaffected and still the right way to author migrations.
 - Enable FK enforcement (`PRAGMA foreign_keys = ON;`) on the connection or
   `ON DELETE CASCADE` won't fire. It's in `db.ts`.
 - Enums are TS unions in `schema.ts`; DB CHECK constraints live in the `.sql`
